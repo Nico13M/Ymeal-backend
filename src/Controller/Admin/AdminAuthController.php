@@ -17,7 +17,7 @@ use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInt
 use Symfony\Component\Security\Http\Event\InteractiveLoginEvent;
 
 #[Route('/admin/auth', name: 'admin_auth_')]
-class AuthController extends AbstractController
+class AdminAuthController extends AbstractController
 {
     #[Route('/register', name: 'register', methods: ['POST'])]
     public function register(Request $request, UserPasswordHasherInterface $passwordHasher, EntityManagerInterface $em): JsonResponse

@@ -35,16 +35,15 @@ class UserEditType extends AbstractType
                     new Assert\NotBlank(),
                     new Assert\Length(['max' => 100]),
                 ],
-            ])
-        ;
+            ]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'data_class' => User::class,
-            'csrf_protection' => false,
-            'allow_extra_fields' => true,
+            'csrf_protection' => false,       // Les routes API gèrent CSRF via header
+            'allow_extra_fields' => true,     // Permet d’ignorer des champs envoyés par le front
         ]);
     }
 }

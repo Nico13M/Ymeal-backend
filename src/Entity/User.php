@@ -5,10 +5,11 @@ namespace App\Entity;
 use App\Repository\UserRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Gedmo\Timestampable\Traits\TimestampableEntity;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
-class User
+class User implements PasswordAuthenticatedUserInterface
 {
  
        use TimestampableEntity;
@@ -81,5 +82,10 @@ class User
         $this->password_hash = $password_hash;
 
         return $this;
+    }
+
+    public function getPassword(): ?string
+    {
+        return $this->password_hash;
     }
 }

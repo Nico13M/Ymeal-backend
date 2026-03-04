@@ -3,6 +3,7 @@
 namespace App\Controller\Admin;
 
 use App\Entity\Ingredient;
+use App\Entity\Units;
 use App\Repository\IngredientRepository;
 use App\Service\CsrfService;
 use App\Service\UserManager;
@@ -49,7 +50,7 @@ class AdminIngredientController extends AbstractController
     }
 
     // --- 3. CRÉATION (POST) ---
-    #[Route('/', name: 'create', methods: ['POST'])]
+    #[Route('/create', name: 'create', methods: ['POST'])]
     public function create(
         Request $request,
         EntityManagerInterface $em,
@@ -81,6 +82,16 @@ class AdminIngredientController extends AbstractController
 
         $ingredient = new Ingredient();
         $ingredient->setName($data['name']);
+
+        // Associer l'unité si fournie
+        if (!empty($data['units_id'])) {
+            $unit = $em->getRepository(Units::class)->find($data['units_id']);
+            if (!$unit) {
+                return $this->json(['error' => 'Unité introuvable'], 404);
+            }
+            $ingredient->setUnits($unit);
+        }
+
         // Le slug et les dates sont gérés par Gedmo automatiquement !
 
         $em->persist($ingredient);
@@ -111,6 +122,19 @@ class AdminIngredientController extends AbstractController
         if (isset($data['name']) && !empty($data['name'])) {
             $ingredient->setName($data['name']);
             // Le slug se mettra à jour tout seul si le nom change
+        }
+
+        // Mise à jour de l'unité
+        if (array_key_exists('units_id', $data)) {
+            if ($data['units_id'] === null) {
+                $ingredient->setUnits(null);
+            } else {
+                $unit = $em->getRepository(Units::class)->find($data['units_id']);
+                if (!$unit) {
+                    return $this->json(['error' => 'Unité introuvable'], 404);
+                }
+                $ingredient->setUnits($unit);
+            }
         }
 
         $em->flush();
@@ -151,6 +175,11 @@ class AdminIngredientController extends AbstractController
             'id' => $ingredient->getId(),
             'name' => $ingredient->getName(),
             'slug' => $ingredient->getSlug(),
+            'units' => $ingredient->getUnits() ? [
+                'id' => $ingredient->getUnits()->getId(),
+                'name' => $ingredient->getUnits()->getName(),
+                'symbol' => $ingredient->getUnits()->getSymbol(),
+            ] : null,
             'created_at' => $ingredient->getCreatedAt()?->format('Y-m-d H:i:s'),
             'updated_at' => $ingredient->getUpdatedAt()?->format('Y-m-d H:i:s'),
         ];

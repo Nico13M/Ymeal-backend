@@ -6,6 +6,7 @@ use App\Entity\Ingredient;
 use App\Entity\Units;
 use App\Repository\IngredientRepository;
 use App\Service\CsrfService;
+use App\Service\IngredientService;
 use App\Service\UserManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,7 +24,7 @@ class AdminIngredientController extends AbstractController
 
     // --- 1. LISTE (GET) ---
     #[Route('/', name: 'index', methods: ['GET'])]
-    public function index(Request $request, IngredientRepository $ingredientRepository): Response
+    public function index(Request $request, IngredientRepository $ingredientRepository, IngredientService $ingredientService): Response
     {
         // 🔒 Sécurité : Vérifier si l'admin est connecté
         if ($err = $this->userManager->ensureAuthenticated($request)) {
@@ -33,20 +34,20 @@ class AdminIngredientController extends AbstractController
         $ingredients = $ingredientRepository->findAll();
 
         // On formate les données manuellement pour éviter le bug des objets vides "{}"
-        $data = array_map(fn(Ingredient $ing) => $this->serializeIngredient($ing), $ingredients);
+        $data = array_map(fn(Ingredient $ing) => $ingredientService->serializeIngredient($ing), $ingredients);
 
         return $this->json($data);
     }
 
     // --- 2. DÉTAIL (GET {id}) ---
     #[Route('/{id}', name: 'show', methods: ['GET'])]
-    public function show(Request $request, Ingredient $ingredient): Response
+    public function show(Request $request, Ingredient $ingredient, IngredientService $ingredientService): Response
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
         }
 
-        return $this->json($this->serializeIngredient($ingredient));
+        return $this->json($ingredientService->serializeIngredient($ingredient));
     }
 
     // --- 3. CRÉATION (POST) ---
@@ -54,7 +55,8 @@ class AdminIngredientController extends AbstractController
     public function create(
         Request $request,
         EntityManagerInterface $em,
-        CsrfService $csrfService
+        CsrfService $csrfService,
+        IngredientService $ingredientService
     ): Response {
         // 🔒 1. Auth
         if ($err = $this->userManager->ensureAuthenticated($request)) {
@@ -69,35 +71,12 @@ class AdminIngredientController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        // Validation
-        if (empty($data['name'])) {
-            return $this->json(['error' => 'Le nom est obligatoire'], 400);
+        $result = $ingredientService->createIngredient($data);
+        if ($result instanceof JsonResponse) {
+            return $result;
         }
 
-        // Vérification doublon
-        $existing = $em->getRepository(Ingredient::class)->findOneBy(['name' => $data['name']]);
-        if ($existing) {
-            return $this->json(['error' => 'Cet ingrédient existe déjà'], 409);
-        }
-
-        $ingredient = new Ingredient();
-        $ingredient->setName($data['name']);
-
-        // Associer l'unité si fournie
-        if (!empty($data['units_id'])) {
-            $unit = $em->getRepository(Units::class)->find($data['units_id']);
-            if (!$unit) {
-                return $this->json(['error' => 'Unité introuvable'], 404);
-            }
-            $ingredient->setUnits($unit);
-        }
-
-        // Le slug et les dates sont gérés par Gedmo automatiquement !
-
-        $em->persist($ingredient);
-        $em->flush();
-
-        return $this->json($this->serializeIngredient($ingredient), 201);
+        return $this->json($ingredientService->serializeIngredient($result), 201);
     }
 
     // --- 4. MODIFICATION (PATCH) ---
@@ -106,7 +85,8 @@ class AdminIngredientController extends AbstractController
         Request $request,
         Ingredient $ingredient,
         EntityManagerInterface $em,
-        CsrfService $csrfService
+        CsrfService $csrfService,
+        IngredientService $ingredientService
     ): Response {
         // 🔒 Auth & CSRF
         if ($err = $this->userManager->ensureAuthenticated($request)) {
@@ -119,27 +99,12 @@ class AdminIngredientController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        if (isset($data['name']) && !empty($data['name'])) {
-            $ingredient->setName($data['name']);
-            // Le slug se mettra à jour tout seul si le nom change
+        $result = $ingredientService->updateIngredient($ingredient, $data);
+        if ($result instanceof JsonResponse) {
+            return $result;
         }
 
-        // Mise à jour de l'unité
-        if (array_key_exists('units_id', $data)) {
-            if ($data['units_id'] === null) {
-                $ingredient->setUnits(null);
-            } else {
-                $unit = $em->getRepository(Units::class)->find($data['units_id']);
-                if (!$unit) {
-                    return $this->json(['error' => 'Unité introuvable'], 404);
-                }
-                $ingredient->setUnits($unit);
-            }
-        }
-
-        $em->flush();
-
-        return $this->json($this->serializeIngredient($ingredient));
+        return $this->json($ingredientService->serializeIngredient($result));
     }
 
     // --- 5. SUPPRESSION (DELETE) ---
@@ -148,7 +113,8 @@ class AdminIngredientController extends AbstractController
         Request $request,
         Ingredient $ingredient,
         EntityManagerInterface $em,
-        CsrfService $csrfService
+        CsrfService $csrfService,
+        IngredientService $ingredientService
     ): JsonResponse {
         // 🔒 Auth & CSRF
         if ($err = $this->userManager->ensureAuthenticated($request)) {
@@ -159,8 +125,7 @@ class AdminIngredientController extends AbstractController
             return $this->json(['error' => 'Invalid CSRF token'], Response::HTTP_FORBIDDEN);
         }
 
-        $em->remove($ingredient);
-        $em->flush();
+        $ingredientService->deleteIngredient($ingredient);
 
         return $this->json(['message' => 'Ingrédient supprimé'], 204);
     }

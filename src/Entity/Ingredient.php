@@ -47,6 +47,10 @@ class Ingredient
     #[ORM\ManyToMany(targetEntity: Frigo::class, mappedBy: 'ingredients_has_frigo')]
     private Collection $frigos;
 
+    #[ORM\ManyToOne(inversedBy: 'ingredients')]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?Units $units = null;
+
     public function __construct()
     {
         $this->recipeIngredients = new ArrayCollection();
@@ -163,6 +167,18 @@ class Ingredient
         if ($this->frigos->removeElement($frigo)) {
             $frigo->removeIngredientsHasFrigo($this);
         }
+
+        return $this;
+    }
+
+    public function getUnits(): ?Units
+    {
+        return $this->units;
+    }
+
+    public function setUnits(?Units $units): static
+    {
+        $this->units = $units;
 
         return $this;
     }

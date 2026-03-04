@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controller\Admin;
 
 use App\Entity\Diet;
@@ -23,20 +22,25 @@ use App\Entity\User;
 class AdminRecipeController extends AbstractController
 {
     public function __construct(
-        private UserManager $userManager,
-        private RecipeService $recipeService,
-        private UserDataService $userDataService,
-        private DataService $dataService,
-        private RecipeSearchService $recipeSearchService,
-        private EntityManagerInterface $em
+        private UserManager $userManager, // Gestion de l'authentification
+        private RecipeService $recipeService, // Sérialisation des recettes
+        private UserDataService $userDataService, // Données utilisateur
+        private DataService $dataService, // Envoi de données
+        private RecipeSearchService $recipeSearchService, // Recherche avancée
+        private EntityManagerInterface $em // ORM Doctrine
     ) {}
 
     // ============= ROUTES SPÉCIFIQUES (AVANT {id}) =============
+    // ⚠️ IMPORTANT: Les routes spécifiques DOIVENT être avant /{id} sinon /create sera matchée par /{id}!
 
-    // LISTE
+    /**
+     * 📋 GET /admin/recipes
+     * Liste toutes les recettes publiques
+     */
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request, RecipeRepository $recipeRepository): Response
     {
+        // ✅ Vérifier l'authentification
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
         }
@@ -47,7 +51,10 @@ class AdminRecipeController extends AbstractController
         return $this->json($data);
     }
 
-    // RECHERCHE
+    /**
+     * 🔍 GET /admin/recipes/search?difficulty=easy&dish_type=pasta
+     * Recherche avancée avec filtres multiples
+     */
     #[Route('/search', name: 'search', methods: ['GET'])]
     public function search(Request $request): Response
     {
@@ -58,12 +65,17 @@ class AdminRecipeController extends AbstractController
         $user = $this->getUser();
         assert($user instanceof User);
 
+        // Appeler le service de recherche
         $result = $this->recipeSearchService->searchRecipes($user, $request);
 
         return $this->json($result['data'], 200);
     }
 
-    // ⭐ CRÉATION (AVANT {id}!)
+    /**
+     * ✅ POST /admin/recipes/create
+     * Créer une nouvelle recette
+     * Body: { name, description, servings, is_public, difficulty?, time?, duration?, dish_type?, ingredients?, diet_ids? }
+     */
     #[Route('/create', name: 'create', methods: ['POST'])]
     public function create(Request $request): Response
     {
@@ -78,7 +90,7 @@ class AdminRecipeController extends AbstractController
             return $this->json(['error' => 'Non authentifié'], 401);
         }
 
-        // ✅ VALIDATION
+        // ✅ VALIDATION des champs obligatoires
         $required = ['name', 'description', 'servings', 'is_public'];
         foreach ($required as $field) {
             if (!isset($data[$field])) {
@@ -96,16 +108,16 @@ class AdminRecipeController extends AbstractController
             $recipe->setDescription($data['description']);
             $recipe->setServings((int) $data['servings']);
             $recipe->setIsPublic((bool) $data['is_public']);
-            $recipe->setUser($user);
+            $recipe->setUser($user); // Lier à l'auteur
 
-            // 🔧 Optionnels
+            // 🔧 Champs optionnels
             if (isset($data['duration'])) $recipe->setDuration((int) $data['duration']);
             if (isset($data['time'])) $recipe->setTime((int) $data['time']);
             if (isset($data['difficulty'])) $recipe->setDifficulty($data['difficulty']);
             if (isset($data['dish_type'])) $recipe->setDishType($data['dish_type']);
             if (isset($data['image'])) $recipe->setImage($data['image']);
 
-            // 🥗 Ajouter les régimes
+            // 🥗 Ajouter les régimes alimentaires
             if (isset($data['diet_ids']) && is_array($data['diet_ids'])) {
                 $diets = $this->em->getRepository(Diet::class)->findBy(['id' => $data['diet_ids']]);
                 foreach ($diets as $diet) {
@@ -121,6 +133,7 @@ class AdminRecipeController extends AbstractController
 
                     if (!$ingredient) continue;
 
+                    // Créer la relation RecipeIngredient
                     $recipeIngredient = new \App\Entity\RecipeIngredient();
                     $recipeIngredient->setRecipe($recipe);
                     $recipeIngredient->setIngredient($ingredient);
@@ -132,7 +145,7 @@ class AdminRecipeController extends AbstractController
                 }
             }
 
-            // 💾 Sauvegarder
+            // 💾 Sauvegarder la recette
             $this->em->persist($recipe);
             $this->em->flush();
 
@@ -150,7 +163,10 @@ class AdminRecipeController extends AbstractController
         }
     }
 
-    // BLACKLIST
+    /**
+     * 🚫 GET /admin/recipes/user/blacklist
+     * Récupérer la liste noire des ingrédients de l'utilisateur
+     */
     #[Route('/user/blacklist', name: 'user_blacklist', methods: ['GET'])]
     public function getUserBlacklist(Request $request): Response
     {
@@ -171,7 +187,10 @@ class AdminRecipeController extends AbstractController
         return $this->json($data);
     }
 
-    // FAVORIS
+    /**
+     * ⭐ GET /admin/recipes/favorites
+     * Récupérer les recettes favorites de l'utilisateur
+     */
     #[Route('/favorites', name: 'favorites', methods: ['GET'])]
     public function getFavorites(Request $request): Response
     {
@@ -188,7 +207,10 @@ class AdminRecipeController extends AbstractController
         return $this->json($data);
     }
 
-    // ENVOYER DONNÉES UTILISATEUR
+    /**
+     * 📤 POST /admin/recipes/user/data/send
+     * Envoyer les données de l'utilisateur (RGPD)
+     */
     #[Route('/user/data/send', name: 'send_user_data', methods: ['POST'])]
     public function sendUserData(Request $request): Response
     {
@@ -217,10 +239,12 @@ class AdminRecipeController extends AbstractController
     }
 
     // ============= ROUTES GÉNÉRIQUES (APRÈS {id}) =============
+    // ⚠️ Ces routes DOIVENT être après les routes spécifiques!
 
-    // ============= DÉTAILS & MODIFICATION =============
-
-    // DÉTAIL COMPLET
+    /**
+     * 📖 GET /admin/recipes/{id}
+     * Obtenir les détails complets d'une recette
+     */
     #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function show(Request $request, Recipe $recipe): Response
     {
@@ -231,7 +255,11 @@ class AdminRecipeController extends AbstractController
         return $this->json($this->recipeService->serializeRecipe($recipe), 200);
     }
 
-    // MODIFICATION
+    /**
+     * ✏️ PATCH /admin/recipes/{id}/edit
+     * Modifier une recette existante
+     * Body: { name?, description?, servings?, difficulty?, time?, duration?, dish_type?, image?, is_public?, diet_ids?, ingredients? }
+     */
     #[Route('/{id}/edit', name: 'edit', methods: ['PATCH'], requirements: ['id' => '\d+'])]
     public function edit(Request $request, Recipe $recipe, EntityManagerInterface $em): Response
     {
@@ -240,12 +268,14 @@ class AdminRecipeController extends AbstractController
         }
 
         $user = $this->getUser();
+        // ✅ Vérifier que l'utilisateur est l'auteur
         if ($recipe->getUser()->getId() !== $user->getId()) {
             return $this->json(['error' => 'Non autorisé'], 403);
         }
 
         $data = json_decode($request->getContent(), true) ?? [];
 
+        // Mettre à jour les champs fournis
         if (isset($data['name'])) $recipe->setName($data['name']);
         if (isset($data['description'])) $recipe->setDescription($data['description']);
         if (isset($data['servings'])) $recipe->setServings((int) $data['servings']);
@@ -269,11 +299,13 @@ class AdminRecipeController extends AbstractController
 
         // Modifier les ingrédients
         if (isset($data['ingredients'])) {
+            // Supprimer les anciens ingrédients
             foreach ($recipe->getRecipeIngredients() as $recipeIng) {
                 $recipe->removeRecipeIngredient($recipeIng);
                 $em->remove($recipeIng);
             }
 
+            // Ajouter les nouveaux
             foreach ($data['ingredients'] as $ingData) {
                 $ingredient = $em->getRepository(Ingredient::class)
                     ->find($ingData['ingredient_id'] ?? null);
@@ -296,9 +328,10 @@ class AdminRecipeController extends AbstractController
         return $this->json($this->recipeService->serializeRecipe($recipe), 200);
     }
 
-    // ============= SUPPRESSION & FAVORIS =============
-
-    // SUPPRESSION
+    /**
+     * 🗑️ DELETE /admin/recipes/{id}/delete
+     * Supprimer une recette
+     */
     #[Route('/{id}/delete', name: 'delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]
     public function delete(Request $request, Recipe $recipe, EntityManagerInterface $em): Response
     {
@@ -307,6 +340,7 @@ class AdminRecipeController extends AbstractController
         }
 
         $user = $this->getUser();
+        // ✅ Vérifier que l'utilisateur est l'auteur
         if ($recipe->getUser()->getId() !== $user->getId()) {
             return $this->json(['error' => 'Non autorisé'], 403);
         }
@@ -317,7 +351,10 @@ class AdminRecipeController extends AbstractController
         return $this->json(['message' => 'Recette supprimée avec succès'], 200);
     }
 
-    // AJOUTER AUX FAVORIS
+    /**
+     * ⭐ POST /admin/recipes/{id}/favorite
+     * Ajouter une recette aux favoris
+     */
     #[Route('/{id}/favorite', name: 'add_favorite', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function addToFavorites(Request $request, Recipe $recipe, EntityManagerInterface $em): Response
     {
@@ -328,6 +365,7 @@ class AdminRecipeController extends AbstractController
         $user = $this->getUser();
         assert($user instanceof User);
 
+        // ✅ Vérifier que la recette n'est pas déjà en favoris
         if ($user->getUserRecipePreferences()->contains($recipe)) {
             return $this->json(['message' => 'La recette est déjà dans vos favoris'], 400);
         }
@@ -341,7 +379,10 @@ class AdminRecipeController extends AbstractController
         ], 200);
     }
 
-    // RETIRER DES FAVORIS
+    /**
+     * 🗑️⭐ DELETE /admin/recipes/{id}/favorite
+     * Retirer une recette des favoris
+     */
     #[Route('/{id}/favorite', name: 'remove_favorite', methods: ['DELETE'], requirements: ['id' => '\d+'])]
     public function removeFromFavorites(Request $request, Recipe $recipe, EntityManagerInterface $em): Response
     {
@@ -352,6 +393,7 @@ class AdminRecipeController extends AbstractController
         $user = $this->getUser();
         assert($user instanceof User);
 
+        // ✅ Vérifier que la recette est bien en favoris
         if (!$user->getUserRecipePreferences()->contains($recipe)) {
             return $this->json(['message' => 'La recette n\'est pas dans vos favoris'], 400);
         }

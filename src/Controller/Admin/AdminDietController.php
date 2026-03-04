@@ -213,7 +213,6 @@ class AdminDietController extends AbstractController
     public function assignToUser(int $id, int $userId, Request $request): JsonResponse
     {
         try {
-            // Verify CSRF token
             $csrfToken = $request->headers->get('X-CSRF-TOKEN');
             if (!$this->csrfService->isValid('api', $csrfToken)) {
                 return $this->json([
@@ -221,7 +220,6 @@ class AdminDietController extends AbstractController
                     'error' => 'Invalid CSRF token',
                 ], Response::HTTP_FORBIDDEN);
             }
-
             $diet = $this->dietManager->getDietById($id);
             if (!$diet) {
                 return $this->json([
@@ -229,29 +227,20 @@ class AdminDietController extends AbstractController
                     'error' => 'Diet not found',
                 ], Response::HTTP_NOT_FOUND);
             }
-
-            $user = $this->entityManager
-                ->getRepository(User::class)
-                ->find($userId);
-
+            $user = $this->entityManager->getRepository(User::class)->find($userId);
             if (!$user) {
                 return $this->json([
                     'success' => false,
                     'error' => 'User not found',
                 ], Response::HTTP_NOT_FOUND);
             }
-
-            // Check if user already has this diet
             if ($diet->getUserHasDiet()->contains($user)) {
                 return $this->json([
                     'success' => false,
                     'error' => 'User already has this diet',
                 ], Response::HTTP_BAD_REQUEST);
             }
-
-            $diet->addUserHasDiet($user);
-            $this->entityManager->flush();
-
+            $this->dietManager->assignDietToUser($diet, $user);
             return $this->json([
                 'success' => true,
                 'message' => 'Diet assigned to user successfully',
@@ -272,7 +261,6 @@ class AdminDietController extends AbstractController
     public function removeFromUser(int $id, int $userId, Request $request): JsonResponse
     {
         try {
-            // Verify CSRF token
             $csrfToken = $request->headers->get('X-CSRF-TOKEN');
             if (!$this->csrfService->isValid('api', $csrfToken)) {
                 return $this->json([
@@ -280,7 +268,6 @@ class AdminDietController extends AbstractController
                     'error' => 'Invalid CSRF token',
                 ], Response::HTTP_FORBIDDEN);
             }
-
             $diet = $this->dietManager->getDietById($id);
             if (!$diet) {
                 return $this->json([
@@ -288,29 +275,20 @@ class AdminDietController extends AbstractController
                     'error' => 'Diet not found',
                 ], Response::HTTP_NOT_FOUND);
             }
-
-            $user = $this->entityManager
-                ->getRepository(User::class)
-                ->find($userId);
-
+            $user = $this->entityManager->getRepository(User::class)->find($userId);
             if (!$user) {
                 return $this->json([
                     'success' => false,
                     'error' => 'User not found',
                 ], Response::HTTP_NOT_FOUND);
             }
-
-            // Check if user has this diet
             if (!$diet->getUserHasDiet()->contains($user)) {
                 return $this->json([
                     'success' => false,
                     'error' => 'User does not have this diet',
                 ], Response::HTTP_BAD_REQUEST);
             }
-
-            $diet->removeUserHasDiet($user);
-            $this->entityManager->flush();
-
+            $this->dietManager->removeDietFromUser($diet, $user);
             return $this->json([
                 'success' => true,
                 'message' => 'Diet removed from user successfully',
@@ -324,14 +302,4 @@ class AdminDietController extends AbstractController
         }
     }
 
-    /**
-     * Helper method to serialize a diet entity
-     */
-    private function serializeDiet(Diet $diet): array
-    {
-        return [
-            'id' => $diet->getId(),
-            'name' => $diet->getName(),
-        ];
-    }
 }

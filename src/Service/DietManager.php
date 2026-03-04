@@ -85,4 +85,26 @@ class DietManager
     {
         return array_map(fn(Diet $diet) => $this->serializeDiet($diet), $diets);
     }
+
+    /**
+     * Associe un régime à un utilisateur
+     */
+    public function assignDietToUser(Diet $diet, $user): void
+    {
+        if (!$diet->getUserHasDiet()->contains($user)) {
+            $diet->addUserHasDiet($user);
+            $this->entityManager->flush();
+        }
+    }
+
+    /**
+     * Dissocie un régime d'un utilisateur
+     */
+    public function removeDietFromUser(Diet $diet, $user): void
+    {
+        if ($diet->getUserHasDiet()->contains($user)) {
+            $diet->removeUserHasDiet($user);
+            $this->entityManager->flush();
+        }
+    }
 }

@@ -41,6 +41,15 @@ class Recipe
     #[ORM\Column(nullable: true)]
     private ?int $duration = null;
 
+    #[ORM\Column(length: 50, nullable: true)]
+    private ?string $difficulty = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $time = null;
+
+    #[ORM\Column(length: 100, nullable: true)]
+    private ?string $dishType = null;
+
     #[ORM\Column]
     private ?bool $is_public = null;
 
@@ -143,6 +152,38 @@ class Recipe
     public function setDuration(?int $duration): static
     {
         $this->duration = $duration;
+        return $this;
+    }
+
+    public function getDifficulty(): ?string
+    {
+        return $this->difficulty;
+    }
+
+    public function setDifficulty(?string $difficulty): static
+    {
+        $this->difficulty = $difficulty;
+        return $this;
+    }
+
+    public function getTime(): ?int
+    {
+        return $this->time;
+    }
+
+    public function setTime(?int $time): static
+    {
+        $this->time = $time;
+        return $this;
+    }
+       public function getDishType(): ?string
+    {
+        return $this->dishType;
+    }
+
+    public function setDishType(?string $dishType): static
+    {
+        $this->dishType = $dishType;
         return $this;
     }
 

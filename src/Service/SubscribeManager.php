@@ -35,6 +35,19 @@ class SubscribeManager
         return $result;
     }
 
+    /**
+     * Sérialise une subscription en tableau
+     */
+    public function serialize(Subscription $subscription): array
+    {
+        return [
+            'id' => $subscription->getId(),
+            'name' => $subscription->getName(),
+            'price' => $subscription->getPrice(),
+            'duration_months' => $subscription->getDurationMonths(),
+        ];
+    }
+
     public function find(int $id): ?Subscription
     {
         return $this->subscriptionRepository->find($id);

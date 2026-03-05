@@ -49,7 +49,7 @@ class AdminUserSubscribeController extends AbstractController
         try {
             $result = $manager->create($userId, $subscriptionId, $csrfToken, $startDateStr, $endDateStr);
             return new JsonResponse($result, 201);
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+        } catch (HttpException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getStatusCode());
         } catch (\Exception $e) {
             return $this->json(['error' => $e->getMessage()], 500);
@@ -71,7 +71,7 @@ class AdminUserSubscribeController extends AbstractController
         try {
             $result = $manager->edit($userId, $subscriptionId, $data, $csrfToken);
             return $this->json($result);
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+        } catch (HttpException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getStatusCode());
         } catch (\Exception $e) {
             return $this->json(['error' => $e->getMessage()], 500);

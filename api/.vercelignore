@@ -1,0 +1,2 @@
+// Ce fichier permet à Vercel de détecter le projet PHP/Symfony et d'utiliser le builder PHP officiel.
+// Aucune configuration supplémentaire n'est nécessaire ici, mais il est recommandé de garder ce fichier pour la compatibilité future.

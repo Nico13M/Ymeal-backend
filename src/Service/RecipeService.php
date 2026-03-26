@@ -3,98 +3,93 @@
 namespace App\Service;
 
 use App\Entity\Recipe;
-use App\Entity\User;
-use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\HttpFoundation\JsonResponse;
 
 class RecipeService
 {
-    public function __construct(
-        private EntityManagerInterface $entityManager
-    ) {}
-
     /**
-     * Crée une nouvelle recette à partir des données fournies
-     */
-    public function createRecipe(array $data, ?User $user = null): Recipe|JsonResponse
-    {
-        // 1. Validation des champs obligatoires
-        if (empty($data['name'])) {
-            return new JsonResponse(['error' => 'Le nom de la recette est obligatoire'], 400);
-        }
-
-        // 2. RECUPERATION DE L'UTILISATEUR 
-        if (!$user && isset($data['user_id'])) {
-            $user = $this->entityManager->getRepository(User::class)->find($data['user_id']);
-        }
-
-        // Si on a trouvé personne => Erreur
-        if (!$user) {
-            return new JsonResponse(['error' => 'Utilisateur introuvable. Veuillez fournir un "user_id" valide.'], 404);
-        }
-
-        // 3. Création de la recette
-        $recipe = new Recipe();
-        $recipe->setName($data['name']);
-        $recipe->setDescription($data['description'] ?? '');
-        $recipe->setImage($data['image'] ?? null);
-        $recipe->setServings($data['servings'] ?? 4);
-        $recipe->setDuration($data['duration'] ?? null);
-        $recipe->setIsPublic($data['is_public'] ?? false);
-
-        // Ajouter les diets
-        foreach ($data['diets_has_recipe'] ?? [] as $dietId) {
-            $diet = $this->entityManager->getRepository(\App\Entity\Diet::class)->find($dietId);
-            if ($diet) {
-                $recipe->addDietsHasRecipe($diet);
-            }
-        }
-
-        // On assigne l'utilisateur trouvé
-        $recipe->setUser($user);
-
-        // Persister la recette
-        $this->entityManager->persist($recipe);
-        $this->entityManager->flush();
-
-        return $recipe;
-    }
-
-    /**
-     * Sérialise une recette en tableau pour la réponse JSON
+     * 🍽️ Sérialise une recette COMPLÈTE avec tous ses détails (pour GET /{id})
+     * Utilisé pour afficher les détails d'une recette
      */
     public function serializeRecipe(Recipe $recipe): array
     {
         return [
+            // ============= INFORMATIONS DE BASE =============
             'id' => $recipe->getId(),
             'name' => $recipe->getName(),
             'slug' => $recipe->getSlug(),
             'description' => $recipe->getDescription(),
             'image' => $recipe->getImage(),
             'servings' => $recipe->getServings(),
-            'duration' => $recipe->getDuration(),
-            'is_public' => $recipe->isPublic(),
-            'created_at' => $recipe->getCreatedAt()?->format('Y-m-d H:i:s'),
-            'diets_has_recipe' => array_map(fn($diet) => [
-                'id' => $diet->getId(),
-                'name' => $diet->getName(),
-                'slug' => $diet->getSlug()
-            ], $recipe->getDietsHasRecipe()->toArray()),
-            'author' => [
-                'id' => $recipe->getUser()?->getId(),
-                'email' => $recipe->getUser()?->getEmail(),
-                'firstname' => $recipe->getUser()?->getFirstname(),
-                'lastname' => $recipe->getUser()?->getLastname(),
+
+            // ============= TIMING DE CUISSON =============
+            'timing' => [
+                'duration' => $recipe->getDuration(), // Cuisson
+                'prep_time' => $recipe->getTime(), // Préparation
+                'total_time' => ($recipe->getDuration() ?? 0) + ($recipe->getTime() ?? 0), // Total
             ],
-            'ingredients' => array_map(function($link) {
-                return [
-                    'id' => $link->getIngredient()->getId(),
-                    'name' => $link->getIngredient()->getName(),
-                    'slug' => $link->getIngredient()->getSlug(),
-                    'quantity' => $link->getQuantity(),
-                    'unit' => $link->getUnit(),
-                ];
-            }, $recipe->getRecipeIngredients()->toArray())
+
+            // ============= CATÉGORISATION =============
+            'difficulty' => $recipe->getDifficulty(), // easy, medium, hard
+            'dish_type' => $recipe->getDishType(), // pasta, salad, etc.
+            'is_public' => $recipe->getIsPublic(),
+
+            // ============= TIMESTAMPS =============
+            'timestamps' => [
+                'created_at' => $recipe->getCreatedAt()?->format('Y-m-d H:i:s'),
+                'updated_at' => $recipe->getUpdatedAt()?->format('Y-m-d H:i:s'),
+            ],
+
+            // ============= AUTEUR =============
+            'author' => $recipe->getUser() ? [
+                'id' => $recipe->getUser()->getId(),
+                'name' => $recipe->getUser()->getFirstname() . ' ' . $recipe->getUser()->getLastname(),
+                'email' => $recipe->getUser()->getEmail(),
+            ] : null,
+
+            // ============= CONTENU NUTRITIONNEL =============
+            'nutrition' => [
+                'diets' => array_map(fn($diet) => [
+                    'id' => $diet->getId(),
+                    'name' => $diet->getName(),
+                ], $recipe->getDietsHasRecipe()->toArray()),
+                
+                'ingredients' => array_map(fn($recipeIngredient) => [
+                    'id' => $recipeIngredient->getIngredient()->getId(),
+                    'name' => $recipeIngredient->getIngredient()->getName(),
+                    'quantity' => $recipeIngredient->getQuantity(),
+                    'unit' => $recipeIngredient->getUnit(),
+                ], $recipe->getRecipeIngredients()->toArray()),
+            ],
+
+            // ============= ENGAGEMENT =============
+            'engagement' => [
+                'favorites_count' => $recipe->getUserRecipePreferences()?->count() ?? 0, // Nombre de favoris
+            ],
+        ];
+    }
+
+    /**
+     * 📋 Sérialise une recette en version MINIMALISTE (pour les listes /search, /favorites)
+     * Utilisé pour les listes - données réduites pour performancer
+     */
+    public function serializeRecipeMinimal(Recipe $recipe): array
+    {
+        return [
+            'id' => $recipe->getId(),
+            'name' => $recipe->getName(),
+            'slug' => $recipe->getSlug(),
+            'image' => $recipe->getImage(),
+            'description' => $recipe->getDescription(),
+            'servings' => $recipe->getServings(),
+            'difficulty' => $recipe->getDifficulty(),
+            
+            'timing' => [
+                'duration' => $recipe->getDuration(),
+                'prep_time' => $recipe->getTime(),
+            ],
+            
+            'author' => $recipe->getUser()->getFirstname() . ' ' . $recipe->getUser()->getLastname(),
+            'favorites_count' => $recipe->getUserRecipePreferences()?->count() ?? 0,
         ];
     }
 }

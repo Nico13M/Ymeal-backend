@@ -2,18 +2,13 @@
 
 namespace App\Controller\Admin;
 
-use App\Entity\User;
-use App\Form\UserEditType;
 use App\Service\SubscribeManager;
-use App\Repository\UserRepository;
 use App\Service\CsrfService;
 use App\Service\UserManager;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/admin/subscribe', name: 'admin_subscribre_')]
@@ -38,16 +33,10 @@ class AdminSubscribeController extends AbstractController
             return $this->json(['error' => 'Subscription not found'], 404);
         }
 
-        $subscriptionData = [
-            'id' => $subscription->getId(),
-            'name' => $subscription->getName(),
-            'price' => $subscription->getPrice(),
-            'duration_months' => $subscription->getDurationMonths(),
-        ];
-        return $this->json($subscriptionData);
+        return $this->json($this->subscribeManager->serialize($subscription));
     }
 
-    #[Route('/{id}/edit', name: 'edit', methods: ['PATCH'])] 
+    #[Route('/{id}/edit', name: 'edit', methods: ['PATCH'])]
     public function edit(
         Request $request,
         int $id,
@@ -67,14 +56,7 @@ class AdminSubscribeController extends AbstractController
         $data = json_decode($request->getContent(), true);
         $subscription = $this->subscribeManager->update($subscription, $data);
 
-        $subscriptionData = [
-            'id' => $subscription->getId(),
-            'name' => $subscription->getName(),
-            'price' => $subscription->getPrice(),
-            'duration_months' => $subscription->getDurationMonths(),
-        ];
-
-        return $this->json($subscriptionData);
+        return $this->json($this->subscribeManager->serialize($subscription));
     }
 
     #[Route('/create', name: 'create', methods: ['POST'])]
@@ -82,14 +64,14 @@ class AdminSubscribeController extends AbstractController
     {
         $data = json_decode($request->getContent(), true);
         $name = $data['name'] ?? '';
-        $price = (int)$data['price'] ?? 0;
-        $durationMonths = (int)$data['duration_months'] ?? 0;
+        $price = isset($data['price']) ? (int)$data['price'] : 0;
+        $durationMonths = isset($data['duration_months']) ? (int)$data['duration_months'] : 0;
 
         if (!$name || !$price || !$durationMonths) {
             return new JsonResponse(['error' => 'Missing fields: name, price, duration_months required'], 400);
         }
 
-         // Vérification CSRF
+        // Vérification CSRF
         $csrfToken = $request->headers->get('X-CSRF-TOKEN');
         if (!$csrfService->isValid('api', $csrfToken)) {
             return $this->json(['error' => 'Invalid CSRF token'], Response::HTTP_FORBIDDEN);
@@ -125,6 +107,6 @@ class AdminSubscribeController extends AbstractController
         $this->subscribeManager->delete($subscription);
 
         return $this->json(null, Response::HTTP_NO_CONTENT);
-    }   
+    }
 
 }

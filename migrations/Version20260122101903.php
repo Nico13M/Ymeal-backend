@@ -26,13 +26,5 @@ final class Version20260122101903 extends AbstractMigration
     public function down(Schema $schema): void
     {
         // this down() migration is auto-generated, please modify it to your needs
-        $this->addSql('CREATE SCHEMA pgbouncer');
-        $this->addSql('CREATE SCHEMA realtime');
-        $this->addSql('CREATE SCHEMA extensions');
-        $this->addSql('CREATE SCHEMA vault');
-        $this->addSql('CREATE SCHEMA graphql_public');
-        $this->addSql('CREATE SCHEMA graphql');
-        $this->addSql('CREATE SCHEMA auth');
-        $this->addSql('CREATE SCHEMA storage');
     }
 }

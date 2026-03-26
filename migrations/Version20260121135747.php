@@ -30,14 +30,6 @@ final class Version20260121135747 extends AbstractMigration
     public function down(Schema $schema): void
     {
         // this down() migration is auto-generated, please modify it to your needs
-        $this->addSql('CREATE SCHEMA pgbouncer');
-        $this->addSql('CREATE SCHEMA realtime');
-        $this->addSql('CREATE SCHEMA extensions');
-        $this->addSql('CREATE SCHEMA vault');
-        $this->addSql('CREATE SCHEMA graphql_public');
-        $this->addSql('CREATE SCHEMA graphql');
-        $this->addSql('CREATE SCHEMA auth');
-        $this->addSql('CREATE SCHEMA storage');
         $this->addSql('ALTER TABLE recipe_ingredient DROP CONSTRAINT FK_22D1FE1359D8A214');
         $this->addSql('ALTER TABLE recipe_ingredient DROP CONSTRAINT FK_22D1FE13933FE08C');
         $this->addSql('DROP TABLE recipe_ingredient');

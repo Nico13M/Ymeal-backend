@@ -18,7 +18,7 @@ class AdminAuthController extends AbstractController
     #[Route('/register', name: 'register', methods: ['POST'])]
     public function register(Request $request): JsonResponse
     {
-        $data = json_decode($request->getContent(), true);
+        $data = json_decode($request->getContent(), true) ?? [];
         $result = $this->authManager->register($data);
         if (isset($result['error'])) {
             return new JsonResponse(['error' => $result['error']], $result['code']);
@@ -29,7 +29,7 @@ class AdminAuthController extends AbstractController
     #[Route('/login', name: 'login', methods: ['POST'])]
     public function login(Request $request): JsonResponse
     {
-        $data = json_decode($request->getContent(), true);
+        $data = json_decode($request->getContent(), true) ?? [];
         $result = $this->authManager->login($data, $request);
         if (isset($result['error'])) {
             return new JsonResponse(['error' => $result['error']], $result['code']);

@@ -51,6 +51,36 @@ class Ingredient
     #[ORM\JoinColumn(nullable: true)]
     private ?Units $units = null;
 
+    #[ORM\Column]
+    private ?int $code_off = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $generic_name = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $categories_tags = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $allergens = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $nutriscore_grade = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $image_small_url = null;
+
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
+    private ?string $energy_100g = null;
+
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
+    private ?string $fat_100g = null;
+
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
+    private ?string $saturated_fat_100g = null;
+
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
+    private ?string $carbohydrates_100g = null;
+
     public function __construct()
     {
         $this->recipeIngredients = new ArrayCollection();
@@ -179,6 +209,126 @@ class Ingredient
     public function setUnits(?Units $units): static
     {
         $this->units = $units;
+
+        return $this;
+    }
+
+    public function getCodeOff(): ?int
+    {
+        return $this->code_off;
+    }
+
+    public function setCodeOff(int $code_off): static
+    {
+        $this->code_off = $code_off;
+
+        return $this;
+    }
+
+    public function getAllergens(): ?string
+    {
+        return $this->allergens;
+    }
+
+    public function setAllergens(?string $allergens): static
+    {
+        $this->allergens = $allergens;
+
+        return $this;
+    }
+
+    public function getGenericName(): ?string
+    {
+        return $this->generic_name;
+    }
+
+    public function setGenericName(?string $generic_name): static
+    {
+        $this->generic_name = $generic_name;
+
+        return $this;
+    }
+
+    public function getCategoriesTags(): ?string
+    {
+        return $this->categories_tags;
+    }
+
+    public function setCategoriesTags(?string $categories_tags): static
+    {
+        $this->categories_tags = $categories_tags;
+
+        return $this;
+    }
+
+    public function getNutriscoreGrade(): ?string
+    {
+        return $this->nutriscore_grade;
+    }
+
+    public function setNutriscoreGrade(?string $nutriscore_grade): static
+    {
+        $this->nutriscore_grade = $nutriscore_grade;
+
+        return $this;
+    }
+
+    public function getImageSmallUrl(): ?string
+    {
+        return $this->image_small_url;
+    }
+
+    public function setImageSmallUrl(?string $image_small_url): static
+    {
+        $this->image_small_url = $image_small_url;
+
+        return $this;
+    }
+
+    public function getEnergy100g(): ?string
+    {
+        return $this->energy_100g;
+    }
+
+    public function setEnergy100g(?string $energy_100g): static
+    {
+        $this->energy_100g = $energy_100g;
+
+        return $this;
+    }
+
+    public function getFat100g(): ?string
+    {
+        return $this->fat_100g;
+    }
+
+    public function setFat100g(?string $fat_100g): static
+    {
+        $this->fat_100g = $fat_100g;
+
+        return $this;
+    }
+
+    public function getSaturatedFat100g(): ?string
+    {
+        return $this->saturated_fat_100g;
+    }
+
+    public function setSaturatedFat100g(?string $saturated_fat_100g): static
+    {
+        $this->saturated_fat_100g = $saturated_fat_100g;
+
+        return $this;
+    }
+
+    public function getCarbohydrates100g(): ?string
+    {
+        return $this->carbohydrates_100g;
+    }
+
+    public function setCarbohydrates100g(?string $carbohydrates_100g): static
+    {
+        $this->carbohydrates_100g = $carbohydrates_100g;
 
         return $this;
     }

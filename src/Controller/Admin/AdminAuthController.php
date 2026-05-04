@@ -23,7 +23,20 @@ class AdminAuthController extends AbstractController
         if (isset($result['error'])) {
             return new JsonResponse(['error' => $result['error']], $result['code']);
         }
-        return new JsonResponse(['message' => $result['message']], $result['code']);
+        $user = $result['user'];
+        return new JsonResponse([
+            'data' => [
+                'user' => [
+                    'id' => $user->getId(),
+                    'email' => $user->getEmail(),
+                    'firstName' => $user->getFirstName(),
+                    'lastName' => $user->getLastName(),
+                    'nickname' => $user->getNickname(),
+                ],
+            ],
+            'message' => $result['message'],
+            'code' => $result['code']
+        ], $result['code']);
     }
 
     #[Route('/login', name: 'login', methods: ['POST'])]
@@ -34,6 +47,19 @@ class AdminAuthController extends AbstractController
         if (isset($result['error'])) {
             return new JsonResponse(['error' => $result['error']], $result['code']);
         }
-        return new JsonResponse(['message' => $result['message']], $result['code']);
+        $user = $result['user'];
+        return new JsonResponse([
+            'data' => [
+                'user' => [
+                    'id' => $user->getId(),
+                    'email' => $user->getEmail(),
+                    'firstName' => $user->getFirstName(),
+                    'lastName' => $user->getLastName(),
+                    'nickname' => $user->getNickname(),
+                ],
+            ],
+            'message' => 'Login successful',
+            'code' => 200
+        ]);
     }
 }

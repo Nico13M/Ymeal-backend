@@ -55,7 +55,7 @@ class AuthManager
         }
         $this->em->persist($user);
         $this->em->flush();
-        return ['message' => 'User registered', 'code' => 201];
+        return ['user' => $user, 'message' => 'User registered', 'code' => 201];
     }
 
     public function login(array $data, Request $request): array
@@ -74,7 +74,7 @@ class AuthManager
             $this->tokenStorage->setToken($token);
             $event = new InteractiveLoginEvent($request, $token);
             $this->eventDispatcher->dispatch($event);
-            return ['message' => 'Login successful', 'code' => 200];
+            return ['user' => $user, 'message' => 'Login successful', 'code' => 200];
         } catch (AuthenticationException $e) {
             return ['error' => $e->getMessage(), 'code' => 401];
         }

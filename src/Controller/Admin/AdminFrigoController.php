@@ -2,9 +2,12 @@
 namespace App\Controller\Admin;
 
 use App\Entity\Frigo;
+use App\Entity\FrigoIngredient;
 use App\Entity\Ingredient;
+use App\Entity\Units;
 use App\Entity\User;
 use App\Repository\IngredientRepository;
+use App\Repository\UnitsRepository;
 use App\Repository\UserRepository;
 use App\Service\UserManager;
 use Doctrine\ORM\EntityManagerInterface;
@@ -26,27 +29,40 @@ class AdminFrigoController extends AbstractController
         if ($user instanceof User) {
             return $user;
         }
-
         $userId = $request->headers->get('X-User-Id');
         if ($userId && is_numeric($userId)) {
             return $userRepository->find((int) $userId);
         }
-
         return null;
     }
 
     private function getOrCreateFrigo(User $user, EntityManagerInterface $em): Frigo
     {
         $frigo = $user->getFrigo();
-
         if (!$frigo) {
             $frigo = new Frigo();
             $frigo->setUserFrigo($user);
             $em->persist($frigo);
             $em->flush();
         }
-
         return $frigo;
+    }
+
+    private function formatFrigoIngredient(FrigoIngredient $fi): array
+    {
+        $ing = $fi->getIngredient();
+        $unit = $fi->getUnit();
+        return [
+            'id'       => $ing->getId(),
+            'name'     => $ing->getName(),
+            'slug'     => $ing->getSlug(),
+            'quantity' => $fi->getQuantity(),
+            'unit'     => $unit ? [
+                'id'     => $unit->getId(),
+                'name'   => $unit->getName(),
+                'symbol' => $unit->getSymbol(),
+            ] : null,
+        ];
     }
 
     // --- 0. LISTER TOUS LES INGRÉDIENTS DISPONIBLES ---
@@ -57,13 +73,11 @@ class AdminFrigoController extends AbstractController
             return $err;
         }
 
-        $ingredients = $ingredientRepository->findAll();
-
         $data = array_map(fn(Ingredient $i) => [
             'id'   => $i->getId(),
             'name' => $i->getName(),
             'slug' => $i->getSlug(),
-        ], $ingredients);
+        ], $ingredientRepository->findAll());
 
         return $this->json($data);
     }
@@ -83,22 +97,23 @@ class AdminFrigoController extends AbstractController
 
         $frigo = $this->getOrCreateFrigo($user, $em);
 
-        $data = array_map(fn(Ingredient $i) => [
-            'id'   => $i->getId(),
-            'name' => $i->getName(),
-            'slug' => $i->getSlug(),
-        ], $frigo->getIngredientsHasFrigo()->toArray());
+        $data = array_map(
+            fn(FrigoIngredient $fi) => $this->formatFrigoIngredient($fi),
+            $frigo->getFrigoIngredients()->toArray()
+        );
 
         return $this->json($data);
     }
 
-    // --- 2. AJOUTER UN INGRÉDIENT AU FRIGO ---
+    // --- 2. AJOUTER / METTRE À JOUR UN INGRÉDIENT DU FRIGO ---
+    // Body JSON attendu : { "quantity": 2.5, "unit_id": 1 }
     #[Route('/{id}', name: 'add_ingredient', methods: ['POST'])]
     public function addIngredient(
         Request $request,
         Ingredient $ingredient,
         EntityManagerInterface $em,
-        UserRepository $userRepository
+        UserRepository $userRepository,
+        UnitsRepository $unitsRepository
     ): Response {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
@@ -111,14 +126,30 @@ class AdminFrigoController extends AbstractController
 
         $frigo = $this->getOrCreateFrigo($user, $em);
 
-        if ($frigo->getIngredientsHasFrigo()->contains($ingredient)) {
-            return $this->json(['message' => 'Ingrédient déjà dans le frigo'], 400);
+        $body = json_decode($request->getContent(), true) ?? [];
+        $quantity = isset($body['quantity']) ? (float) $body['quantity'] : 1.0;
+        $unitId   = $body['unit_id'] ?? null;
+        $unit     = $unitId ? $unitsRepository->find((int) $unitId) : null;
+
+        // Mise à jour si déjà présent
+        $existing = $frigo->getFrigoIngredientFor($ingredient);
+        if ($existing) {
+            $existing->setQuantity($quantity);
+            if ($unit) $existing->setUnit($unit);
+            $em->flush();
+            return $this->json(['message' => 'Ingrédient mis à jour', 'item' => $this->formatFrigoIngredient($existing)], 200);
         }
 
-        $frigo->addIngredientsHasFrigo($ingredient);
+        $fi = new FrigoIngredient();
+        $fi->setFrigo($frigo);
+        $fi->setIngredient($ingredient);
+        $fi->setQuantity($quantity);
+        $fi->setUnit($unit);
+
+        $em->persist($fi);
         $em->flush();
 
-        return $this->json(['message' => 'Ingrédient ajouté au frigo'], 200);
+        return $this->json(['message' => 'Ingrédient ajouté', 'item' => $this->formatFrigoIngredient($fi)], 201);
     }
 
     // --- 3. SUPPRIMER UN INGRÉDIENT DU FRIGO ---
@@ -143,13 +174,15 @@ class AdminFrigoController extends AbstractController
             return $this->json(['error' => 'Frigo non trouvé'], 404);
         }
 
-        if (!$frigo->getIngredientsHasFrigo()->contains($ingredient)) {
-            return $this->json(['message' => 'Ingrédient non trouvé dans le frigo'], 400);
+        $fi = $frigo->getFrigoIngredientFor($ingredient);
+        if (!$fi) {
+            return $this->json(['message' => 'Ingrédient non trouvé dans le frigo'], 404);
         }
 
-        $frigo->removeIngredientsHasFrigo($ingredient);
+        $frigo->removeFrigoIngredient($fi);
+        $em->remove($fi);
         $em->flush();
 
-        return $this->json(['message' => 'Ingrédient supprimé du frigo'], 200);
+        return $this->json(['message' => 'Ingrédient supprimé'], 200);
     }
 }

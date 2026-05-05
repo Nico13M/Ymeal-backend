@@ -44,8 +44,11 @@ class Ingredient
     /**
      * @var Collection<int, Frigo>
      */
-    #[ORM\ManyToMany(targetEntity: Frigo::class, mappedBy: 'ingredients_has_frigo')]
-    private Collection $frigos;
+    /**
+     * @var Collection<int, FrigoIngredient>
+     */
+    #[ORM\OneToMany(targetEntity: FrigoIngredient::class, mappedBy: 'ingredient', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $frigoIngredients;
 
     #[ORM\ManyToOne(inversedBy: 'ingredients')]
     #[ORM\JoinColumn(nullable: true)]
@@ -85,7 +88,7 @@ class Ingredient
     {
         $this->recipeIngredients = new ArrayCollection();
         $this->users = new ArrayCollection();
-        $this->frigos = new ArrayCollection();
+        $this->frigoIngredients = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -175,27 +178,29 @@ class Ingredient
     }
 
     /**
-     * @return Collection<int, Frigo>
+     * @return Collection<int, FrigoIngredient>
      */
-    public function getFrigos(): Collection
+    public function getFrigoIngredients(): Collection
     {
-        return $this->frigos;
+        return $this->frigoIngredients;
     }
 
-    public function addFrigo(Frigo $frigo): static
+    public function addFrigoIngredient(FrigoIngredient $frigoIngredient): static
     {
-        if (!$this->frigos->contains($frigo)) {
-            $this->frigos->add($frigo);
-            $frigo->addIngredientsHasFrigo($this);
+        if (!$this->frigoIngredients->contains($frigoIngredient)) {
+            $this->frigoIngredients->add($frigoIngredient);
+            $frigoIngredient->setIngredient($this);
         }
 
         return $this;
     }
 
-    public function removeFrigo(Frigo $frigo): static
+    public function removeFrigoIngredient(FrigoIngredient $frigoIngredient): static
     {
-        if ($this->frigos->removeElement($frigo)) {
-            $frigo->removeIngredientsHasFrigo($this);
+        if ($this->frigoIngredients->removeElement($frigoIngredient)) {
+            if ($frigoIngredient->getIngredient() === $this) {
+                $frigoIngredient->setIngredient(null);
+            }
         }
 
         return $this;

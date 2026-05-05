@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Entity;
 
 use App\Repository\FrigoRepository;
@@ -19,17 +18,16 @@ class Frigo
     private ?User $user_frigo = null;
 
     /**
-     * @var Collection<int, Ingredient>
+     * @var Collection<int, FrigoIngredient>
      */
-    #[ORM\ManyToMany(targetEntity: Ingredient::class, inversedBy: 'frigos')]
-    private Collection $ingredients_has_frigo;
+    #[ORM\OneToMany(targetEntity: FrigoIngredient::class, mappedBy: 'frigo', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $frigoIngredients;
 
     public function __construct()
     {
-        $this->ingredients_has_frigo = new ArrayCollection();
+        $this->frigoIngredients = new ArrayCollection();
     }
 
-   
     public function getId(): ?int
     {
         return $this->id;
@@ -43,32 +41,49 @@ class Frigo
     public function setUserFrigo(?User $user_frigo): static
     {
         $this->user_frigo = $user_frigo;
-
         return $this;
     }
 
     /**
-     * @return Collection<int, Ingredient>
+     * @return Collection<int, FrigoIngredient>
      */
-    public function getIngredientsHasFrigo(): Collection
+    public function getFrigoIngredients(): Collection
     {
-        return $this->ingredients_has_frigo;
+        return $this->frigoIngredients;
     }
 
-    public function addIngredientsHasFrigo(Ingredient $ingredientsHasFrigo): static
+    public function addFrigoIngredient(FrigoIngredient $frigoIngredient): static
     {
-        if (!$this->ingredients_has_frigo->contains($ingredientsHasFrigo)) {
-            $this->ingredients_has_frigo->add($ingredientsHasFrigo);
+        if (!$this->frigoIngredients->contains($frigoIngredient)) {
+            $this->frigoIngredients->add($frigoIngredient);
+            $frigoIngredient->setFrigo($this);
         }
-
         return $this;
     }
 
-    public function removeIngredientsHasFrigo(Ingredient $ingredientsHasFrigo): static
+    public function removeFrigoIngredient(FrigoIngredient $frigoIngredient): static
     {
-        $this->ingredients_has_frigo->removeElement($ingredientsHasFrigo);
-
+        $this->frigoIngredients->removeElement($frigoIngredient);
         return $this;
     }
 
+    public function hasIngredient(Ingredient $ingredient): bool
+    {
+        foreach ($this->frigoIngredients as $fi) {
+            if ($fi->getIngredient() === $ingredient) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public function getFrigoIngredientFor(Ingredient $ingredient): ?FrigoIngredient
+    {
+        foreach ($this->frigoIngredients as $fi) {
+            if ($fi->getIngredient() === $ingredient) {
+                return $fi;
+            }
+        }
+        return null;
+    }
 }

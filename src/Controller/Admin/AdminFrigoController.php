@@ -4,7 +4,6 @@ namespace App\Controller\Admin;
 use App\Entity\Frigo;
 use App\Entity\FrigoIngredient;
 use App\Entity\Ingredient;
-use App\Entity\Units;
 use App\Entity\User;
 use App\Repository\IngredientRepository;
 use App\Repository\UnitsRepository;

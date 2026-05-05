@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Controller\Admin;
 
 use App\Entity\Frigo;
@@ -19,9 +18,24 @@ class AdminFrigoController extends AbstractController
     {
     }
 
+    // --- HELPER : récupère ou crée le frigo de l'utilisateur ---
+    private function getOrCreateFrigo(\App\Entity\User $user, EntityManagerInterface $em): Frigo
+    {
+        $frigo = $user->getFrigo();
+
+        if (!$frigo) {
+            $frigo = new Frigo();
+            $frigo->setUserFrigo($user);
+            $em->persist($frigo);
+            $em->flush();
+        }
+
+        return $frigo;
+    }
+
     // --- 1. LISTER LES INGRÉDIENTS DU FRIGO ---
     #[Route('/', name: 'index', methods: ['GET'])]
-    public function index(Request $request): Response
+    public function index(Request $request, EntityManagerInterface $em): Response
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
@@ -29,18 +43,14 @@ class AdminFrigoController extends AbstractController
 
         $user = $this->getUser();
         assert($user instanceof \App\Entity\User);
-        $frigo = $user->getFrigo();
 
-        if (!$frigo) {
-            return $this->json(['error' => 'Frigo non trouvé pour cet utilisateur'], 404);
-        }
+        $frigo = $this->getOrCreateFrigo($user, $em);
 
         $ingredients = $frigo->getIngredientsHasFrigo();
-
         $data = array_map(fn(Ingredient $i) => [
-            'id' => $i->getId(),
+            'id'   => $i->getId(),
             'name' => $i->getName(),
-            'slug' => $i->getSlug()
+            'slug' => $i->getSlug(),
         ], $ingredients->toArray());
 
         return $this->json($data);
@@ -59,21 +69,13 @@ class AdminFrigoController extends AbstractController
 
         $user = $this->getUser();
         assert($user instanceof \App\Entity\User);
-        $frigo = $user->getFrigo();
 
-        if (!$frigo) {
-            // Créer un frigo si inexistant
-            $frigo = new Frigo();
-            $frigo->setUserFrigo($user);
-            $em->persist($frigo);
-        }
+        $frigo = $this->getOrCreateFrigo($user, $em);
 
-        // Vérifier si l'ingrédient est déjà dans le frigo
         if ($frigo->getIngredientsHasFrigo()->contains($ingredient)) {
             return $this->json(['message' => 'Ingrédient déjà dans le frigo'], 400);
         }
 
-        // Ajouter l'ingrédient
         $frigo->addIngredientsHasFrigo($ingredient);
         $em->flush();
 
@@ -93,18 +95,17 @@ class AdminFrigoController extends AbstractController
 
         $user = $this->getUser();
         assert($user instanceof \App\Entity\User);
+
         $frigo = $user->getFrigo();
 
         if (!$frigo) {
             return $this->json(['error' => 'Frigo non trouvé'], 404);
         }
 
-        // Vérifier si l'ingrédient est dans le frigo
         if (!$frigo->getIngredientsHasFrigo()->contains($ingredient)) {
             return $this->json(['message' => 'Ingrédient non trouvé dans le frigo'], 400);
         }
 
-        // Supprimer l'ingrédient
         $frigo->removeIngredientsHasFrigo($ingredient);
         $em->flush();
 

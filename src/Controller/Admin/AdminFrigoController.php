@@ -4,6 +4,7 @@ namespace App\Controller\Admin;
 use App\Entity\Frigo;
 use App\Entity\Ingredient;
 use App\Entity\User;
+use App\Repository\IngredientRepository;
 use App\Repository\UserRepository;
 use App\Service\UserManager;
 use Doctrine\ORM\EntityManagerInterface;
@@ -19,16 +20,13 @@ class AdminFrigoController extends AbstractController
     {
     }
 
-    // --- HELPER : résout l'utilisateur depuis Symfony ou depuis X-User-Id ---
     private function resolveUser(Request $request, UserRepository $userRepository): ?User
     {
-        // 1. Tentative via Symfony (cookie / JWT)
         $user = $this->getUser();
         if ($user instanceof User) {
             return $user;
         }
 
-        // 2. Fallback : header X-User-Id envoyé par le front
         $userId = $request->headers->get('X-User-Id');
         if ($userId && is_numeric($userId)) {
             return $userRepository->find((int) $userId);
@@ -37,7 +35,6 @@ class AdminFrigoController extends AbstractController
         return null;
     }
 
-    // --- HELPER : récupère ou crée le frigo ---
     private function getOrCreateFrigo(User $user, EntityManagerInterface $em): Frigo
     {
         $frigo = $user->getFrigo();
@@ -50,6 +47,25 @@ class AdminFrigoController extends AbstractController
         }
 
         return $frigo;
+    }
+
+    // --- 0. LISTER TOUS LES INGRÉDIENTS DISPONIBLES ---
+    #[Route('/ingredients', name: 'list_ingredients', methods: ['GET'])]
+    public function listIngredients(Request $request, IngredientRepository $ingredientRepository): Response
+    {
+        if ($err = $this->userManager->ensureAuthenticated($request)) {
+            return $err;
+        }
+
+        $ingredients = $ingredientRepository->findAll();
+
+        $data = array_map(fn(Ingredient $i) => [
+            'id'   => $i->getId(),
+            'name' => $i->getName(),
+            'slug' => $i->getSlug(),
+        ], $ingredients);
+
+        return $this->json($data);
     }
 
     // --- 1. LISTER LES INGRÉDIENTS DU FRIGO ---

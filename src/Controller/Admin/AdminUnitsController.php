@@ -2,8 +2,10 @@
 
 namespace App\Controller\Admin;
 
+use App\Entity\Units;
 use App\Service\UnitsManager;
 use App\Service\CsrfService;
+use App\Service\UserManager;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,11 +15,21 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/admin/units', name: 'admin_units_')]
 class AdminUnitsController extends AbstractController
 {
-    #[Route('/', name: 'index', methods: ['GET'])]
-    public function index(UnitsManager $unitsManager)
+    public function __construct(private UserManager $userManager)
     {
+    }
+    #[Route('/index', name: 'index', methods: ['GET'])]
+    public function index(Request $request, UnitsManager $unitsManager)
+    {
+        if ($err = $this->userManager->ensureAuthenticated($request)) {
+            return $err;
+        }
+
         $units = $unitsManager->getAllUnits();
-        $data = array_map([$unitsManager, 'serializeUnit'], $units);
+        $data = array_map(
+            fn(Units $unit) => $unitsManager->serializeUnit($unit),
+            $units
+        );
 
         return $this->json($data);
     }

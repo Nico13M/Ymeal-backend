@@ -64,6 +64,7 @@ class AdminUserController extends AbstractController
         // Vérification CSRF
         $csrfToken = $request->headers->get('X-CSRF-TOKEN');
         if (!$csrfService->isValid('api', $csrfToken)) {
+            return $this->json(['error' => $csrfToken], Response::HTTP_FORBIDDEN);
             return $this->json(['error' => 'Invalid CSRF token'], Response::HTTP_FORBIDDEN);
         }
 

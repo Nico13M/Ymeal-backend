@@ -75,7 +75,7 @@ class Ingredient
     #[ORM\Column(type: 'float', nullable: true)]
     private ?float $fat_100g = null;
 
-    #[ORM\Column(name: 'saturated-fat_100g', type: 'float', nullable: true)]
+    #[ORM\Column(name: 'saturated_fat_100g', type: 'float', nullable: true)]
     private ?float $saturated_fat_100g = null;
 
     #[ORM\Column(type: 'float', nullable: true)]

@@ -69,17 +69,17 @@ class Ingredient
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $image_small_url = null;
 
-    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
-    private ?string $energy_100g = null;
+    #[ORM\Column(type: 'float', nullable: true)]
+    private ?float $energy_100g = null;
 
-    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
-    private ?string $fat_100g = null;
+    #[ORM\Column(type: 'float', nullable: true)]
+    private ?float $fat_100g = null;
 
-    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
-    private ?string $saturated_fat_100g = null;
+    #[ORM\Column(name: 'saturated-fat_100g', type: 'float', nullable: true)]
+    private ?float $saturated_fat_100g = null;
 
-    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
-    private ?string $carbohydrates_100g = null;
+    #[ORM\Column(type: 'float', nullable: true)]
+    private ?float $carbohydrates_100g = null;
 
     public function __construct()
     {
@@ -285,48 +285,48 @@ class Ingredient
         return $this;
     }
 
-    public function getEnergy100g(): ?string
+    public function getEnergy100g(): ?float
     {
         return $this->energy_100g;
     }
 
-    public function setEnergy100g(?string $energy_100g): static
+    public function setEnergy100g(?float $energy_100g): static
     {
         $this->energy_100g = $energy_100g;
 
         return $this;
     }
 
-    public function getFat100g(): ?string
+    public function getFat100g(): ?float
     {
         return $this->fat_100g;
     }
 
-    public function setFat100g(?string $fat_100g): static
+    public function setFat100g(?float $fat_100g): static
     {
         $this->fat_100g = $fat_100g;
 
         return $this;
     }
 
-    public function getSaturatedFat100g(): ?string
+    public function getSaturatedFat100g(): ?float
     {
         return $this->saturated_fat_100g;
     }
 
-    public function setSaturatedFat100g(?string $saturated_fat_100g): static
+    public function setSaturatedFat100g(?float $saturated_fat_100g): static
     {
         $this->saturated_fat_100g = $saturated_fat_100g;
 
         return $this;
     }
 
-    public function getCarbohydrates100g(): ?string
+    public function getCarbohydrates100g(): ?float
     {
         return $this->carbohydrates_100g;
     }
 
-    public function setCarbohydrates100g(?string $carbohydrates_100g): static
+    public function setCarbohydrates100g(?float $carbohydrates_100g): static
     {
         $this->carbohydrates_100g = $carbohydrates_100g;
 

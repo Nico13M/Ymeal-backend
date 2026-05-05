@@ -29,6 +29,7 @@ class AuthManager
         $lastname = $data['lastname'] ?? '';
         $email = $data['email'] ?? '';
         $password = $data['password'] ?? '';
+        $pseudo = trim((string) ($data['pseudo'] ?? ''));
 
         if (!$firstname || !$lastname || !$email || !$password) {
             return ['error' => 'Missing fields: firstname, lastname, email, password required', 'code' => 400];
@@ -45,6 +46,10 @@ class AuthManager
         $user->setFirstname($firstname);
         $user->setLastname($lastname);
         $user->setEmail($email);
+        if ($pseudo === '') {
+            $pseudo = strstr($email, '@', true) ?: $firstname;
+        }
+        $user->setPseudo(substr($pseudo, 0, 45));
         $hash = $this->passwordHasher->hashPassword($user, $password);
         $user->setPasswordHash($hash);
         if (method_exists($user, 'setCreatedAt')) {

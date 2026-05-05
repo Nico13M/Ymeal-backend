@@ -61,6 +61,9 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     #[ORM\OneToOne(mappedBy: 'user_frigo', cascade: ['persist', 'remove'])]
     private ?Frigo $frigo = null;
 
+    #[ORM\Column(length: 45)]
+    private ?string $pseudo = null;
+
     public function __construct()
     {
         $this->userSubscriptions = new ArrayCollection();
@@ -266,6 +269,18 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
         }
 
         $this->frigo = $frigo;
+
+        return $this;
+    }
+
+    public function getPseudo(): ?string
+    {
+        return $this->pseudo;
+    }
+
+    public function setPseudo(string $pseudo): static
+    {
+        $this->pseudo = $pseudo;
 
         return $this;
     }

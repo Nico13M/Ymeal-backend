@@ -5,8 +5,6 @@ namespace App\Controller\Admin;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
-use Doctrine\ORM\EntityManagerInterface;
-use App\Entity\User;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use App\Service\AuthManager;
 
@@ -30,6 +28,7 @@ class AdminAuthController extends AbstractController
                     'id' => $user->getId(),
                     'email' => $user->getEmail(),
                     'firstName' => $user->getFirstName(),
+                    'pseudo' => $user->getPseudo(),
                     'lastName' => $user->getLastName(),
                 ],
             ],
@@ -53,6 +52,7 @@ class AdminAuthController extends AbstractController
                     'id' => $user->getId(),
                     'email' => $user->getEmail(),
                     'firstName' => $user->getFirstName(),
+                    'pseudo' => $user->getPseudo(),
                     'lastName' => $user->getLastName(),
                 ],
             ],

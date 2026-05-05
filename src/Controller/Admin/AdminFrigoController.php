@@ -3,10 +3,11 @@ namespace App\Controller\Admin;
 
 use App\Entity\Frigo;
 use App\Entity\Ingredient;
+use App\Entity\User;
+use App\Repository\UserRepository;
 use App\Service\UserManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -18,8 +19,26 @@ class AdminFrigoController extends AbstractController
     {
     }
 
-    // --- HELPER : récupère ou crée le frigo de l'utilisateur ---
-    private function getOrCreateFrigo(\App\Entity\User $user, EntityManagerInterface $em): Frigo
+    // --- HELPER : résout l'utilisateur depuis Symfony ou depuis X-User-Id ---
+    private function resolveUser(Request $request, UserRepository $userRepository): ?User
+    {
+        // 1. Tentative via Symfony (cookie / JWT)
+        $user = $this->getUser();
+        if ($user instanceof User) {
+            return $user;
+        }
+
+        // 2. Fallback : header X-User-Id envoyé par le front
+        $userId = $request->headers->get('X-User-Id');
+        if ($userId && is_numeric($userId)) {
+            return $userRepository->find((int) $userId);
+        }
+
+        return null;
+    }
+
+    // --- HELPER : récupère ou crée le frigo ---
+    private function getOrCreateFrigo(User $user, EntityManagerInterface $em): Frigo
     {
         $frigo = $user->getFrigo();
 
@@ -35,23 +54,24 @@ class AdminFrigoController extends AbstractController
 
     // --- 1. LISTER LES INGRÉDIENTS DU FRIGO ---
     #[Route('/', name: 'index', methods: ['GET'])]
-    public function index(Request $request, EntityManagerInterface $em): Response
+    public function index(Request $request, EntityManagerInterface $em, UserRepository $userRepository): Response
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
         }
 
-        $user = $this->getUser();
-        assert($user instanceof \App\Entity\User);
+        $user = $this->resolveUser($request, $userRepository);
+        if (!$user) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], 401);
+        }
 
         $frigo = $this->getOrCreateFrigo($user, $em);
 
-        $ingredients = $frigo->getIngredientsHasFrigo();
         $data = array_map(fn(Ingredient $i) => [
             'id'   => $i->getId(),
             'name' => $i->getName(),
             'slug' => $i->getSlug(),
-        ], $ingredients->toArray());
+        ], $frigo->getIngredientsHasFrigo()->toArray());
 
         return $this->json($data);
     }
@@ -61,14 +81,17 @@ class AdminFrigoController extends AbstractController
     public function addIngredient(
         Request $request,
         Ingredient $ingredient,
-        EntityManagerInterface $em
+        EntityManagerInterface $em,
+        UserRepository $userRepository
     ): Response {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
         }
 
-        $user = $this->getUser();
-        assert($user instanceof \App\Entity\User);
+        $user = $this->resolveUser($request, $userRepository);
+        if (!$user) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], 401);
+        }
 
         $frigo = $this->getOrCreateFrigo($user, $em);
 
@@ -87,17 +110,19 @@ class AdminFrigoController extends AbstractController
     public function removeIngredient(
         Request $request,
         Ingredient $ingredient,
-        EntityManagerInterface $em
+        EntityManagerInterface $em,
+        UserRepository $userRepository
     ): Response {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
         }
 
-        $user = $this->getUser();
-        assert($user instanceof \App\Entity\User);
+        $user = $this->resolveUser($request, $userRepository);
+        if (!$user) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], 401);
+        }
 
         $frigo = $user->getFrigo();
-
         if (!$frigo) {
             return $this->json(['error' => 'Frigo non trouvé'], 404);
         }

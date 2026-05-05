@@ -3,19 +3,19 @@ nelmio_cors:
         allow_credentials: true
         origin_regex: true
         allow_origin:
+            - '^https://ymeal-back\.osc-fr1\.scalingo\.io$'
             - '^http://localhost:8081$'
             - '^http://127\.0\.0\.1:8081$'
-        allow_methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
-        allow_headers: ['Content-Type', 'Authorization', 'X-User-Id']
+        allow_methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
+        allow_headers: ['Content-Type', 'X-CSRF-TOKEN', 'Authorization', 'X-User-Id']
         max_age: 3600
-
     paths:
         '^/':
-            allow_credentials: true
             origin_regex: true
             allow_origin:
+                - '^https://ymeal-back\.osc-fr1\.scalingo\.io$'
                 - '^http://localhost:8081$'
                 - '^http://127\.0\.0\.1:8081$'
-            allow_methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
-            allow_headers: ['Content-Type', 'Authorization', 'X-User-Id']
+            allow_headers: ['Content-Type', 'X-CSRF-TOKEN', 'Authorization', 'X-User-Id']
+            allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
             max_age: 3600

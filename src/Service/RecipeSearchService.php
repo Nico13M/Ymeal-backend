@@ -16,7 +16,7 @@ class RecipeSearchService
     ) {}
 
     /**
-     * 🔍 Effectue une recherche de recettes basée sur les critères utilisateur
+     * Effectue une recherche de recettes basée sur les critères utilisateur
      */
     public function searchRecipes(User $user, Request $request): array
     {
@@ -28,7 +28,7 @@ class RecipeSearchService
         $allIngredients = array_merge($frigoIngredients, $formIngredients);
         $servings = (int) $request->query->get('servings', 4);
 
-        // 🔗 Construire la requête avec les filtres
+        // Construire la requête avec les filtres
         $qb = $this->recipeRepository->createQueryBuilder('r');
 
         if ($dietIds) {
@@ -48,9 +48,9 @@ class RecipeSearchService
                      ->getQuery()
                      ->getResult();
 
-        // 📊 Sérialiser les recettes
+        // Sérialiser les recettes
         $serializedRecipes = array_map(
-            fn($recipe) => $this->recipeService->serializeRecipeMinimal($recipe),  // ⭐ Minimaliste
+            fn($recipe) => $this->recipeService->serializeRecipeMinimal($recipe),  // Minimaliste
             $recipes
         );
 
@@ -72,7 +72,7 @@ class RecipeSearchService
     }
 
     /**
-     * 📋 Construit les infos de filtres appliqués de manière lisible
+     * Construit les infos de filtres appliqués de manière lisible
      */
     private function buildFiltersInfo(
         User $user,

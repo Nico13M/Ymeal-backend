@@ -54,10 +54,10 @@ class Ingredient
     #[ORM\JoinColumn(nullable: true)]
     private ?Units $units = null;
 
-      #[ORM\Column(length: 255, nullable: true)]
-    private string $codeOff;
-
     #[ORM\Column(length: 255, nullable: true)]
+    private ?string $codeOff = null;
+
+    #[ORM\Column(name: 'generic_name',length: 255, nullable: true)]
     private ?string $generic_name = null;
 
     #[ORM\Column(length: 255, nullable: true)]
@@ -71,6 +71,18 @@ class Ingredient
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $image_small_url = null;
+
+    #[ORM\Column(type: 'float', nullable: true)]
+    private ?float $sugars_100g = null;
+
+    #[ORM\Column(type: 'float', nullable: true)]
+    private ?float $fiber_100g = null;
+
+    #[ORM\Column(type: 'float', nullable: true)]
+    private ?float $proteins_100g = null;
+
+    #[ORM\Column(type: 'float', nullable: true)]
+    private ?float $salt_100g = null;
 
     #[ORM\Column(type: 'float', nullable: true)]
     private ?float $energy_100g = null;
@@ -335,6 +347,49 @@ class Ingredient
     {
         $this->carbohydrates_100g = $carbohydrates_100g;
 
+        return $this;
+    }
+    public function getSugars100g(): ?float
+    {
+        return $this->sugars_100g;
+    }
+
+    public function setSugars100g(?float $sugars_100g): static
+    {
+        $this->sugars_100g = $sugars_100g;
+        return $this;
+    }
+
+    public function getFiber100g(): ?float
+    {
+        return $this->fiber_100g;
+    }
+
+    public function setFiber100g(?float $fiber_100g): static
+    {
+        $this->fiber_100g = $fiber_100g;
+        return $this;
+    }
+
+    public function getProteins100g(): ?float
+    {
+        return $this->proteins_100g;
+    }
+
+    public function setProteins100g(?float $proteins_100g): static
+    {
+        $this->proteins_100g = $proteins_100g;
+        return $this;
+    }
+
+    public function getSalt100g(): ?float
+    {
+        return $this->salt_100g;
+    }
+
+    public function setSalt100g(?float $salt_100g): static
+    {
+        $this->salt_100g = $salt_100g;
         return $this;
     }
 }

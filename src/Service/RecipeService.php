@@ -31,7 +31,6 @@ class RecipeService
             // ============= CATÉGORISATION =============
             'difficulty' => $recipe->getDifficulty(), // easy, medium, hard
             'dish_type' => $recipe->getDishType(), // pasta, salad, etc.
-            'is_public' => $recipe->getIsPublic(),
 
             // ============= TIMESTAMPS =============
             'timestamps' => [

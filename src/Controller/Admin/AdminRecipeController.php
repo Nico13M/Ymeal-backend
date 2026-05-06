@@ -4,6 +4,7 @@ namespace App\Controller\Admin;
 use App\Entity\Diet;
 use App\Entity\Ingredient;
 use App\Entity\Recipe;
+use App\Entity\Rating;
 use App\Repository\RecipeRepository;
 use App\Service\UserDataService;
 use App\Service\DataService;
@@ -405,5 +406,110 @@ class AdminRecipeController extends AbstractController
             'message' => 'Recette supprimée des favoris',
             'favorites_count' => $recipe->getUserRecipePreferences()->count()
         ], 200);
+    }
+
+    /**
+     * POST /admin/recipes/{id}/ratings
+     * Soumettre une évaluation/commentaire sur une recette
+     * Body: { rating (1-5), comment? }
+     */
+    #[Route('/{id}/ratings', name: 'add_rating', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function addRating(Request $request, Recipe $recipe, EntityManagerInterface $em): Response
+    {
+        if ($err = $this->userManager->ensureAuthenticated($request)) {
+            return $err;
+        }
+
+        $user = $this->getUser();
+        assert($user instanceof User);
+
+        $data = json_decode($request->getContent(), true) ?? [];
+
+        // Validation du rating
+        if (!isset($data['rating'])) {
+            return $this->json(['error' => 'Le champ "rating" est obligatoire'], 400);
+        }
+
+        $rating = (int) $data['rating'];
+        if ($rating < 1 || $rating > 5) {
+            return $this->json(['error' => 'Rating doit être entre 1 et 5'], 400);
+        }
+
+        // Vérifier si l'utilisateur a déjà évalué cette recette
+        $existingRating = $em->getRepository(\App\Entity\Rating::class)
+            ->findByRecipeAndUser($recipe->getId(), $user->getId());
+
+        if ($existingRating) {
+            // Mise à jour de l'évaluation existante
+            $existingRating->setRating($rating);
+            if (isset($data['comment'])) {
+                $existingRating->setComment($data['comment'] ?: null);
+            }
+            $em->flush();
+
+            return $this->json([
+                'message' => 'Évaluation mise à jour',
+                'rating' => [
+                    'id' => $existingRating->getId(),
+                    'rating' => $existingRating->getRating(),
+                    'comment' => $existingRating->getComment(),
+                    'user' => ['id' => $user->getId(), 'pseudo' => $user->getPseudo()],
+                    'createdAt' => $existingRating->getCreatedAt()?->format('Y-m-d H:i:s'),
+                ]
+            ], 200);
+        }
+
+        // Créer une nouvelle évaluation
+        $newRating = new \App\Entity\Rating();
+        $newRating->setRating($rating);
+        if (isset($data['comment'])) {
+            $newRating->setComment($data['comment'] ?: null);
+        }
+        $newRating->setUser($user);
+        $newRating->setRecipe($recipe);
+
+        $em->persist($newRating);
+        $em->flush();
+
+        return $this->json([
+            'message' => 'Évaluation créée',
+            'rating' => [
+                'id' => $newRating->getId(),
+                'rating' => $newRating->getRating(),
+                'comment' => $newRating->getComment(),
+                'user' => ['id' => $user->getId(), 'pseudo' => $user->getPseudo()],
+                'createdAt' => $newRating->getCreatedAt()?->format('Y-m-d H:i:s'),
+            ]
+        ], 201);
+    }
+
+    /**
+     * GET /admin/recipes/{id}/ratings
+     * Récupérer toutes les évaluations d'une recette
+     */
+    #[Route('/{id}/ratings', name: 'get_ratings', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function getRatings(Request $request, Recipe $recipe, EntityManagerInterface $em): Response
+    {
+        if ($err = $this->userManager->ensureAuthenticated($request)) {
+            return $err;
+        }
+
+        $ratings = $em->getRepository(\App\Entity\Rating::class)
+            ->findByRecipe($recipe->getId());
+
+        $data = array_map(function($r) {
+            return [
+                'id' => $r->getId(),
+                'rating' => $r->getRating(),
+                'comment' => $r->getComment(),
+                'user' => ['id' => $r->getUser()->getId(), 'pseudo' => $r->getUser()->getPseudo()],
+                'createdAt' => $r->getCreatedAt()?->format('Y-m-d H:i:s'),
+            ];
+        }, $ratings);
+
+        return $this->json([
+            'count' => count($data),
+            'ratings' => $data
+        ]);
     }
 }

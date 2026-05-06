@@ -35,6 +35,13 @@ class UserEditType extends AbstractType
                     new Assert\NotBlank(),
                     new Assert\Length(['max' => 100]),
                 ],
+            ])
+            ->add('pseudo', TextType::class, [
+                'required' => false,
+                'constraints' => [
+                    new Assert\NotBlank(),
+                    new Assert\Length(['max' => 45]),
+                ],
             ]);
     }
 

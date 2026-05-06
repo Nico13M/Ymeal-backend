@@ -12,6 +12,7 @@ use Gedmo\Mapping\Annotation as Gedmo;
 use Gedmo\Timestampable\Traits\TimestampableEntity;
 use App\Entity\User; 
 use App\Entity\RecipeIngredient;
+use App\Entity\Rating;
 
 #[ORM\Entity(repositoryClass: RecipeRepository::class)]
 class Recipe
@@ -88,11 +89,18 @@ class Recipe
     #[ORM\ManyToMany(targetEntity: User::class, mappedBy: 'user_recipe_preferences')]
     private Collection $user_recipe_preferences; // Utilisateurs qui ont mis en favoris
 
+    /**
+     * @var Collection<int, Rating>
+     */
+    #[ORM\OneToMany(mappedBy: 'recipe', targetEntity: Rating::class, orphanRemoval: true)]
+    private Collection $ratings; // Évaluations et commentaires
+
     public function __construct()
     {
         $this->recipeIngredients = new ArrayCollection();
         $this->diets_has_recipe = new ArrayCollection();
         $this->user_recipe_preferences = new ArrayCollection();
+        $this->ratings = new ArrayCollection();
     }
 
     // ============= GETTERS & SETTERS =============
@@ -171,6 +179,27 @@ class Recipe
     public function removeUserRecipePreference(User $user_recipe_preference): static
     {
         $this->user_recipe_preferences->removeElement($user_recipe_preference);
+        return $this;
+    }
+
+    // ============= GESTION DES ÉVALUATIONS =============
+
+    public function getRatings(): Collection { return $this->ratings; }
+    public function addRating(Rating $rating): static
+    {
+        if (!$this->ratings->contains($rating)) {
+            $this->ratings->add($rating);
+            $rating->setRecipe($this);
+        }
+        return $this;
+    }
+    public function removeRating(Rating $rating): static
+    {
+        if ($this->ratings->removeElement($rating)) {
+            if ($rating->getRecipe() === $this) {
+                $rating->setRecipe(null);
+            }
+        }
         return $this;
     }
 }

@@ -54,7 +54,7 @@ class Ingredient
     #[ORM\JoinColumn(nullable: true)]
     private ?Units $units = null;
 
-      #[ORM\Column(type: 'bigint')]
+      #[ORM\Column(length: 255, nullable: true)]
     private string $codeOff;
 
     #[ORM\Column(length: 255, nullable: true)]

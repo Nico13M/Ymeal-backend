@@ -54,8 +54,8 @@ class Ingredient
     #[ORM\JoinColumn(nullable: true)]
     private ?Units $units = null;
 
-    #[ORM\Column]
-    private ?int $code_off = null;
+      #[ORM\Column(type: 'bigint')]
+    private string $codeOff;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $generic_name = null;
@@ -218,17 +218,17 @@ class Ingredient
         return $this;
     }
 
-    public function getCodeOff(): ?int
+    public function getCodeOff(): string 
     {
-        return $this->code_off;
+        return $this->codeOff; 
+    }
+    
+    public function setCodeOff(string $codeOff): self 
+    { 
+        $this->codeOff = $codeOff; 
+        return $this; 
     }
 
-    public function setCodeOff(int $code_off): static
-    {
-        $this->code_off = $code_off;
-
-        return $this;
-    }
 
     public function getAllergens(): ?string
     {

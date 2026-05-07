@@ -184,4 +184,32 @@ class AdminFrigoController extends AbstractController
 
         return $this->json(['message' => 'Ingrédient supprimé'], 200);
     }
+
+     #[Route('/count', name: 'count', methods: ['GET'])]
+    public function count(Request $request): Response
+    {
+        if ($err = $this->userManager->ensureAuthenticated($request)) {
+            return $err;
+        }
+ 
+        $user = $this->getUser();
+        assert($user instanceof User);
+ 
+        $frigo = $user->getFrigo();
+ 
+        // L'utilisateur n'a pas encore de frigo créé
+        if ($frigo === null) {
+            return $this->json([
+                'count'     => 0,
+                'has_frigo' => false,
+            ]);
+        }
+ 
+        $count = $this->frigoIngredientRepository->countByFrigo($frigo->getId());
+ 
+        return $this->json([
+            'count'     => $count,
+            'has_frigo' => true,
+        ]);
+    }
 }

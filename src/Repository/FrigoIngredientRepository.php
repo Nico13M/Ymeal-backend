@@ -11,4 +11,14 @@ class FrigoIngredientRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, FrigoIngredient::class);
     }
+
+    public function countByFrigo(int $frigoId): int
+    {
+        return (int) $this->createQueryBuilder('fi')
+            ->select('COUNT(fi.id)')
+            ->where('fi.frigo = :frigoId')
+            ->setParameter('frigoId', $frigoId)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

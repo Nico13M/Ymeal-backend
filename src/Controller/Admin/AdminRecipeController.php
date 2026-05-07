@@ -406,4 +406,42 @@ class AdminRecipeController extends AbstractController
             'favorites_count' => $recipe->getUserRecipePreferences()->count()
         ], 200);
     }
+
+    #[Route('/count', name: 'count', methods: ['GET'])]
+    public function count(Request $request, RecipeRepository $recipeRepository): Response
+    {
+        if ($err = $this->userManager->ensureAuthenticated($request)) {
+            return $err;
+        }
+
+        $criteria = [];
+
+        if ($request->query->has('is_public')) {
+            $criteria['isPublic'] = filter_var($request->query->get('is_public'), FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if ($request->query->has('difficulty')) {
+            $criteria['difficulty'] = $request->query->get('difficulty');
+        }
+
+        if ($request->query->has('dish_type')) {
+            $criteria['dishType'] = $request->query->get('dish_type');
+        }
+
+        // Compter uniquement les recettes de l'utilisateur courant
+        if ($request->query->getBoolean('mine')) {
+            $user = $this->getUser();
+            assert($user instanceof User);
+            $criteria['user'] = $user;
+        }
+
+        $count = empty($criteria)
+            ? count($recipeRepository->findAll())
+            : $recipeRepository->count($criteria);
+
+        return $this->json([
+            'count' => $count,
+            'filters' => $criteria ? array_keys($criteria) : []
+        ]);
+    }
 }

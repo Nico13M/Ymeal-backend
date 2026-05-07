@@ -87,4 +87,17 @@ class RecipeRepository extends ServiceEntityRepository
         }
         return $count;
     }
+
+    public function countWithCriteria(array $criteria = []): int
+    {
+        $qb = $this->createQueryBuilder('r')
+            ->select('COUNT(r.id)');
+
+        foreach ($criteria as $field => $value) {
+            $qb->andWhere("r.$field = :$field")
+            ->setParameter($field, $value);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
 }

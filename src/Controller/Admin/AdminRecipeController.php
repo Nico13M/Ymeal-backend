@@ -31,6 +31,19 @@ class AdminRecipeController extends AbstractController
         private EntityManagerInterface $em // ORM Doctrine
     ) {}
 
+    /**
+     * Retourne une réponse JSON avec le header X-User-Id
+     */
+    private function jsonWithUserId($data, int $statusCode = 200): Response
+    {
+        $response = $this->json($data, $statusCode);
+        $user = $this->getUser();
+        if ($user instanceof User) {
+            $response->headers->set('X-User-Id', (string) $user->getId());
+        }
+        return $response;
+    }
+
     // ============= ROUTES SPÉCIFIQUES (AVANT {id}) =============
     // IMPORTANT: Les routes spécifiques DOIVENT être avant /{id} sinon /create sera matchée par /{id}!
 
@@ -51,7 +64,7 @@ class AdminRecipeController extends AbstractController
         $recipes = $recipeRepository->findAll();
         $data = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r, $user), $recipes);
 
-        return $this->json($data);
+        return $this->jsonWithUserId($data);
     }
 
     /**
@@ -71,7 +84,7 @@ class AdminRecipeController extends AbstractController
         // Appeler le service de recherche
         $result = $this->recipeSearchService->searchRecipes($user, $request);
 
-        return $this->json($result['data'], 200);
+        return $this->jsonWithUserId($result['data'], 200);
     }
 
     /**
@@ -158,7 +171,7 @@ class AdminRecipeController extends AbstractController
             $this->em->persist($recipe);
             $this->em->flush();
 
-            return $this->json([
+            return $this->jsonWithUserId([
                 'success' => true,
                 'message' => 'Recette créée avec succès',
                 'recipe' => $this->recipeService->serializeRecipe($recipe, $user)
@@ -193,7 +206,7 @@ class AdminRecipeController extends AbstractController
             'slug' => $ingredient->getSlug()
         ], $blacklist->toArray());
 
-        return $this->json($data);
+        return $this->jsonWithUserId($data);
     }
 
     /**
@@ -213,7 +226,7 @@ class AdminRecipeController extends AbstractController
 
         $data = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r, $user), $favorites->toArray());
 
-        return $this->json($data);
+        return $this->jsonWithUserId($data);
     }
 
     /**
@@ -343,7 +356,7 @@ class AdminRecipeController extends AbstractController
 
         $em->flush();
 
-        return $this->json($this->recipeService->serializeRecipe($recipe, $user), 200);
+        return $this->jsonWithUserId($this->recipeService->serializeRecipe($recipe, $user), 200);
     }
 
     /**
@@ -383,7 +396,7 @@ class AdminRecipeController extends AbstractController
         $user = $this->getUser();
         assert($user instanceof User);
 
-        return $this->json([
+        return $this->jsonWithUserId([
             'is_favorited' => $user->getUserRecipePreferences()->contains($recipe),
             'favorites_count' => $recipe->getUserRecipePreferences()->count()
         ], 200);
@@ -411,7 +424,7 @@ class AdminRecipeController extends AbstractController
         $user->addUserRecipePreference($recipe);
         $em->flush();
 
-        return $this->json([
+        return $this->jsonWithUserId([
             'message' => 'Recette ajoutée aux favoris',
             'is_favorited' => true,
             'favorites_count' => $recipe->getUserRecipePreferences()->count()
@@ -440,7 +453,7 @@ class AdminRecipeController extends AbstractController
         $user->removeUserRecipePreference($recipe);
         $em->flush();
 
-        return $this->json([
+        return $this->jsonWithUserId([
             'message' => 'Recette supprimée des favoris',
             'is_favorited' => false,
             'favorites_count' => $recipe->getUserRecipePreferences()->count()
@@ -479,9 +492,9 @@ class AdminRecipeController extends AbstractController
             ? count($recipeRepository->findAll())
             : $recipeRepository->count($criteria);
 
-        return $this->json([
+        return $this->jsonWithUserId([
             'count' => $count,
             'filters' => $criteria ? array_keys($criteria) : []
-        ]);
+        ]);}
     }
 }

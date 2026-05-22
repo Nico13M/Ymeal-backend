@@ -497,4 +497,3 @@ class AdminRecipeController extends AbstractController
             'filters' => $criteria ? array_keys($criteria) : []
         ]);}
     }
-}

@@ -254,3 +254,4 @@ class AdminRatingController extends AbstractController
             'json_decode_result' => json_decode($request->getContent(), true),
         ], 200);
     }
+    }

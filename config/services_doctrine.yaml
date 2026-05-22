@@ -1,0 +1,5 @@
+services:
+  App\EventListener\ConsoleBootstrapListener: ~
+
+  App\EventListener\DoctrineBootstrapListener: ~
+

@@ -128,11 +128,21 @@ class AdminRatingController extends AbstractController
             return $this->jsonWithUserId(['error' => 'Vous ne pouvez pas noter votre propre recette'], 403);
         }
 
-        $data = json_decode($request->getContent(), true) ?? [];
+        // Récupérer les données du JSON
+        try {
+            $data = $request->toArray();
+        } catch (\Exception $e) {
+            // Fallback si toArray() échoue
+            $content = $request->getContent();
+            if (empty($content)) {
+                return $this->jsonWithUserId(['error' => 'Aucune donnée envoyée. Assurez-vous que Content-Type: application/json est défini', 'received' => ''], 400);
+            }
+            $data = json_decode($content, true) ?? [];
+        }
 
         // Validation
         if (!isset($data['rating'])) {
-            return $this->jsonWithUserId(['error' => "Le champ 'rating' est obligatoire"], 400);
+            return $this->jsonWithUserId(['error' => "Le champ 'rating' est obligatoire", 'received_data' => $data], 400);
         }
 
         $value = (int) $data['rating'];
@@ -229,4 +239,18 @@ class AdminRatingController extends AbstractController
 
         return $this->jsonWithUserId(['rating' => $this->serialize($rating)]);
     }
-}
+
+    /**
+     * POST /admin/ratings/debug
+     * Debug pour voir ce qui est reçu
+     */
+    #[Route('/debug', name: 'debug', methods: ['POST'])]
+    public function debug(Request $request): Response
+    {
+        return $this->json([
+            'content_type' => $request->headers->get('Content-Type'),
+            'content' => $request->getContent(),
+            'toArray_result' => $request->toArray(),
+            'json_decode_result' => json_decode($request->getContent(), true),
+        ], 200);
+    }

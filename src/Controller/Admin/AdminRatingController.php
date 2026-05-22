@@ -13,7 +13,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[Route('/admin/recipes/{recipeId}/ratings', name: 'admin_rating_', requirements: ['recipeId' => '\d+'])]
+#[Route('/admin/ratings', name: 'admin_rating_')]
 class AdminRatingController extends AbstractController
 {
     public function __construct(
@@ -21,6 +21,19 @@ class AdminRatingController extends AbstractController
         private EntityManagerInterface $em,
         private RatingRepository $ratingRepository
     ) {}
+
+    /**
+     * Retourne une réponse JSON avec le header X-User-Id
+     */
+    private function jsonWithUserId($data, int $statusCode = 200): Response
+    {
+        $response = $this->json($data, $statusCode);
+        $user = $this->getUser();
+        if ($user instanceof User) {
+            $response->headers->set('X-User-Id', (string) $user->getId());
+        }
+        return $response;
+    }
 
     // ============= HELPERS =============
 
@@ -32,7 +45,7 @@ class AdminRatingController extends AbstractController
         $recipe = $this->em->getRepository(Recipe::class)->find($recipeId);
 
         if (!$recipe) {
-            return $this->json(['error' => 'Recette introuvable'], 404);
+            return $this->jsonWithUserId(['error' => 'Recette introuvable'], 404);
         }
 
         return $recipe;
@@ -68,11 +81,11 @@ class AdminRatingController extends AbstractController
     // ============= ROUTES =============
 
     /**
-     * GET /admin/recipes/{recipeId}/ratings
+     * GET /admin/ratings/recipes/{recipeId}
      * Liste tous les ratings d'une recette avec la moyenne
      */
-    #[Route('', name: 'index', methods: ['GET'])]
-    public function index(Request $request, int $recipeId): Response
+    #[Route('/recipes/{recipeId}', name: 'list_ratings', methods: ['GET'], requirements: ['recipeId' => '\d+'])]
+    public function listRatings(Request $request, int $recipeId): Response
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
@@ -84,19 +97,19 @@ class AdminRatingController extends AbstractController
         $ratings = $this->ratingRepository->findByRecipeWithUser($recipe);
         $stats   = $this->ratingRepository->getStatsForRecipe($recipe);
 
-        return $this->json([
+        return $this->jsonWithUserId([
             'stats'   => $stats,
             'ratings' => array_map(fn(Rating $r) => $this->serialize($r), $ratings),
         ]);
     }
 
     /**
-     * POST /admin/recipes/{recipeId}/ratings
+     * POST /admin/ratings/create-or-update/{recipeId}
      * Créer ou mettre à jour le rating de l'utilisateur courant
      * Body: { rating: int (1-5), comment?: string }
      */
-    #[Route('', name: 'upsert', methods: ['POST'])]
-    public function upsert(Request $request, int $recipeId): Response
+    #[Route('/create-or-update/{recipeId}', name: 'create_or_update_rating', methods: ['POST'], requirements: ['recipeId' => '\d+'])]
+    public function createOrUpdateRating(Request $request, int $recipeId): Response
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
@@ -106,23 +119,25 @@ class AdminRatingController extends AbstractController
         if ($recipe instanceof Response) return $recipe;
 
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->jsonWithUserId(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
 
         // Empêcher l'auteur de noter sa propre recette
         if ($recipe->getUser()->getId() === $user->getId()) {
-            return $this->json(['error' => 'Vous ne pouvez pas noter votre propre recette'], 403);
+            return $this->jsonWithUserId(['error' => 'Vous ne pouvez pas noter votre propre recette'], 403);
         }
 
         $data = json_decode($request->getContent(), true) ?? [];
 
         // Validation
         if (!isset($data['rating'])) {
-            return $this->json(['error' => "Le champ 'rating' est obligatoire"], 400);
+            return $this->jsonWithUserId(['error' => "Le champ 'rating' est obligatoire"], 400);
         }
 
         $value = (int) $data['rating'];
         if ($value < 1 || $value > 5) {
-            return $this->json(['error' => 'La note doit être comprise entre 1 et 5'], 400);
+            return $this->jsonWithUserId(['error' => 'La note doit être comprise entre 1 et 5'], 400);
         }
 
         // Upsert : mise à jour si déjà existant, création sinon
@@ -144,7 +159,7 @@ class AdminRatingController extends AbstractController
 
         $this->em->flush();
 
-        return $this->json([
+        return $this->jsonWithUserId([
             'success' => true,
             'message' => $isNew ? 'Note ajoutée avec succès' : 'Note mise à jour avec succès',
             'rating'  => $this->serialize($rating),
@@ -153,11 +168,11 @@ class AdminRatingController extends AbstractController
     }
 
     /**
-     * DELETE /admin/recipes/{recipeId}/ratings
+     * DELETE /admin/ratings/delete/{recipeId}
      * Supprimer le rating de l'utilisateur courant
      */
-    #[Route('', name: 'delete', methods: ['DELETE'])]
-    public function delete(Request $request, int $recipeId): Response
+    #[Route('/delete/{recipeId}', name: 'delete_rating', methods: ['DELETE'], requirements: ['recipeId' => '\d+'])]
+    public function deleteRating(Request $request, int $recipeId): Response
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
@@ -167,18 +182,20 @@ class AdminRatingController extends AbstractController
         if ($recipe instanceof Response) return $recipe;
 
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->jsonWithUserId(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
 
         $rating = $this->ratingRepository->findOneByUserAndRecipe($user, $recipe);
 
         if (!$rating) {
-            return $this->json(['error' => "Vous n'avez pas encore noté cette recette"], 404);
+            return $this->jsonWithUserId(['error' => "Vous n'avez pas encore noté cette recette"], 404);
         }
 
         $this->em->remove($rating);
         $this->em->flush();
 
-        return $this->json([
+        return $this->jsonWithUserId([
             'success' => true,
             'message' => 'Note supprimée avec succès',
             'stats'   => $this->ratingRepository->getStatsForRecipe($recipe),
@@ -186,11 +203,11 @@ class AdminRatingController extends AbstractController
     }
 
     /**
-     * GET /admin/recipes/{recipeId}/ratings/me
+     * GET /admin/ratings/recipes/{recipeId}/me
      * Récupérer le rating de l'utilisateur courant pour cette recette
      */
-    #[Route('/me', name: 'me', methods: ['GET'])]
-    public function me(Request $request, int $recipeId): Response
+    #[Route('/recipes/{recipeId}/me', name: 'get_my_rating', methods: ['GET'], requirements: ['recipeId' => '\d+'])]
+    public function getMyRating(Request $request, int $recipeId): Response
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
@@ -200,14 +217,16 @@ class AdminRatingController extends AbstractController
         if ($recipe instanceof Response) return $recipe;
 
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->jsonWithUserId(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
 
         $rating = $this->ratingRepository->findOneByUserAndRecipe($user, $recipe);
 
         if (!$rating) {
-            return $this->json(['rating' => null]);
+            return $this->jsonWithUserId(['rating' => null]);
         }
 
-        return $this->json(['rating' => $this->serialize($rating)]);
+        return $this->jsonWithUserId(['rating' => $this->serialize($rating)]);
     }
 }

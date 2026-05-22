@@ -4,9 +4,13 @@ namespace App\Service;
 
 use App\Entity\Recipe;
 use App\Entity\User;
+use App\Repository\RatingRepository;
 
 class RecipeService
 {
+    public function __construct(
+        private RatingRepository $ratingRepository
+    ) {}
     /**
      * 🍽️ Sérialise une recette COMPLÈTE avec tous ses détails (pour GET /{id})
      * Utilisé pour afficher les détails d'une recette
@@ -74,6 +78,35 @@ class RecipeService
                 'favorites_count' => $recipe->getUserRecipePreferences()?->count() ?? 0, // Nombre de favoris
                 'is_favorited' => $user ? $user->getUserRecipePreferences()->contains($recipe) : false, // Est en favoris par l'utilisateur
             ],
+
+            // ============= RATINGS & COMMENTAIRES =============
+            'ratings' => $this->serializeRecipeRatings($recipe),
+        ];
+    }
+
+    /**
+     * 📊 Sérialise les ratings d'une recette avec stats et commentaires
+     */
+    private function serializeRecipeRatings(Recipe $recipe): array
+    {
+        $stats = $this->ratingRepository->getStatsForRecipe($recipe);
+        $ratingList = $this->ratingRepository->findByRecipeWithUser($recipe);
+
+        return [
+            'stats' => $stats, // Moyenne, count, distribution
+            'comments' => array_map(function($rating) {
+                return [
+                    'id' => $rating->getId(),
+                    'rating' => $rating->getRating(),
+                    'comment' => $rating->getComment(),
+                    'user' => [
+                        'id' => $rating->getUser()->getId(),
+                        'name' => $rating->getUser()->getFirstname() . ' ' . $rating->getUser()->getLastname(),
+                    ],
+                    'created_at' => $rating->getCreatedAt()->format('Y-m-d H:i:s'),
+                    'updated_at' => $rating->getUpdatedAt()->format('Y-m-d H:i:s'),
+                ];
+            }, $ratingList),
         ];
     }
 

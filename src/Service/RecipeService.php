@@ -31,6 +31,7 @@ class RecipeService
             // ============= CATÉGORISATION =============
             'difficulty' => $recipe->getDifficulty(), // easy, medium, hard
             'dish_type' => $recipe->getDishType(), // pasta, salad, etc.
+            'is_public' => $recipe->isPublic(), // Visibilité publique
 
             // ============= TIMESTAMPS =============
             'timestamps' => [
@@ -86,6 +87,13 @@ class RecipeService
                 'duration' => $recipe->getDuration(),
                 'prep_time' => $recipe->getTime(),
             ],
+            
+            'ingredients' => array_map(fn($recipeIngredient) => [
+                'id' => $recipeIngredient->getIngredient()->getId(),
+                'name' => $recipeIngredient->getIngredient()->getName(),
+                'quantity' => $recipeIngredient->getQuantity(),
+                'unit' => $recipeIngredient->getUnit(),
+            ], $recipe->getRecipeIngredients()->toArray()),
             
             'author' => $recipe->getUser()->getFirstname() . ' ' . $recipe->getUser()->getLastname(),
             'favorites_count' => $recipe->getUserRecipePreferences()?->count() ?? 0,

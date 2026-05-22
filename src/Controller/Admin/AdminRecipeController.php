@@ -60,7 +60,9 @@ class AdminRecipeController extends AbstractController
         }
 
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
         $recipes = $recipeRepository->findAll();
         $data = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r, $user), $recipes);
 
@@ -79,7 +81,9 @@ class AdminRecipeController extends AbstractController
         }
 
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
 
         // Appeler le service de recherche
         $result = $this->recipeSearchService->searchRecipes($user, $request);
@@ -197,7 +201,9 @@ class AdminRecipeController extends AbstractController
         }
 
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
         $blacklist = $user->getUserIngredientsBlacklist();
 
         $data = array_map(fn($ingredient) => [
@@ -221,7 +227,9 @@ class AdminRecipeController extends AbstractController
         }
 
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
         $favorites = $user->getUserRecipePreferences();
 
         $data = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r, $user), $favorites->toArray());
@@ -241,7 +249,9 @@ class AdminRecipeController extends AbstractController
         }
 
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
 
         $userData = $this->userDataService->getUserData($user);
         $result = $this->dataService->sendUserData($userData, $user->getId());
@@ -275,7 +285,9 @@ class AdminRecipeController extends AbstractController
         }
 
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
 
         return $this->json($this->recipeService->serializeRecipe($recipe, $user), 200);
     }
@@ -394,7 +406,9 @@ class AdminRecipeController extends AbstractController
         }
 
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
 
         return $this->jsonWithUserId([
             'is_favorited' => $user->getUserRecipePreferences()->contains($recipe),
@@ -414,7 +428,9 @@ class AdminRecipeController extends AbstractController
         }
 
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
 
         // Vérifier que la recette n'est pas déjà en favoris
         if ($user->getUserRecipePreferences()->contains($recipe)) {
@@ -443,7 +459,9 @@ class AdminRecipeController extends AbstractController
         }
 
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
 
         // Vérifier que la recette est bien en favoris
         if (!$user->getUserRecipePreferences()->contains($recipe)) {
@@ -484,7 +502,9 @@ class AdminRecipeController extends AbstractController
         // Compter uniquement les recettes de l'utilisateur courant
         if ($request->query->getBoolean('mine')) {
             $user = $this->getUser();
-            assert($user instanceof User);
+            if (!$user instanceof User) {
+                return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+            }
             $criteria['user'] = $user;
         }
 

@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Entity\Recipe;
+use App\Entity\User;
 
 class RecipeService
 {
@@ -10,7 +11,7 @@ class RecipeService
      * 🍽️ Sérialise une recette COMPLÈTE avec tous ses détails (pour GET /{id})
      * Utilisé pour afficher les détails d'une recette
      */
-    public function serializeRecipe(Recipe $recipe): array
+    public function serializeRecipe(Recipe $recipe, ?User $user = null): array
     {
         return [
             // ============= INFORMATIONS DE BASE =============
@@ -71,6 +72,7 @@ class RecipeService
             // ============= ENGAGEMENT =============
             'engagement' => [
                 'favorites_count' => $recipe->getUserRecipePreferences()?->count() ?? 0, // Nombre de favoris
+                'is_favorited' => $user ? $user->getUserRecipePreferences()->contains($recipe) : false, // Est en favoris par l'utilisateur
             ],
         ];
     }

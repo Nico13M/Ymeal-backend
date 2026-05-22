@@ -46,8 +46,10 @@ class AdminRecipeController extends AbstractController
             return $err;
         }
 
+        $user = $this->getUser();
+        assert($user instanceof User);
         $recipes = $recipeRepository->findAll();
-        $data = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r), $recipes);
+        $data = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r, $user), $recipes);
 
         return $this->json($data);
     }
@@ -159,7 +161,7 @@ class AdminRecipeController extends AbstractController
             return $this->json([
                 'success' => true,
                 'message' => 'Recette créée avec succès',
-                'recipe' => $this->recipeService->serializeRecipe($recipe)
+                'recipe' => $this->recipeService->serializeRecipe($recipe, $user)
             ], 201);
 
         } catch (\Exception $e) {
@@ -209,7 +211,7 @@ class AdminRecipeController extends AbstractController
         assert($user instanceof User);
         $favorites = $user->getUserRecipePreferences();
 
-        $data = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r), $favorites->toArray());
+        $data = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r, $user), $favorites->toArray());
 
         return $this->json($data);
     }
@@ -259,7 +261,10 @@ class AdminRecipeController extends AbstractController
             return $err;
         }
 
-        return $this->json($this->recipeService->serializeRecipe($recipe), 200);
+        $user = $this->getUser();
+        assert($user instanceof User);
+
+        return $this->json($this->recipeService->serializeRecipe($recipe, $user), 200);
     }
 
     /**
@@ -338,7 +343,7 @@ class AdminRecipeController extends AbstractController
 
         $em->flush();
 
-        return $this->json($this->recipeService->serializeRecipe($recipe), 200);
+        return $this->json($this->recipeService->serializeRecipe($recipe, $user), 200);
     }
 
     /**
@@ -365,6 +370,26 @@ class AdminRecipeController extends AbstractController
     }
 
     /**
+     * GET /admin/recipes/{id}/favorite/status
+     * Vérifier si une recette est en favoris pour l'utilisateur courant
+     */
+    #[Route('/{id}/favorite/status', name: 'favorite_status', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function getFavoriteStatus(Request $request, Recipe $recipe): Response
+    {
+        if ($err = $this->userManager->ensureAuthenticated($request)) {
+            return $err;
+        }
+
+        $user = $this->getUser();
+        assert($user instanceof User);
+
+        return $this->json([
+            'is_favorited' => $user->getUserRecipePreferences()->contains($recipe),
+            'favorites_count' => $recipe->getUserRecipePreferences()->count()
+        ], 200);
+    }
+
+    /**
      * POST /admin/recipes/{id}/favorite
      * Ajouter une recette aux favoris
      */
@@ -388,6 +413,7 @@ class AdminRecipeController extends AbstractController
 
         return $this->json([
             'message' => 'Recette ajoutée aux favoris',
+            'is_favorited' => true,
             'favorites_count' => $recipe->getUserRecipePreferences()->count()
         ], 200);
     }
@@ -416,6 +442,7 @@ class AdminRecipeController extends AbstractController
 
         return $this->json([
             'message' => 'Recette supprimée des favoris',
+            'is_favorited' => false,
             'favorites_count' => $recipe->getUserRecipePreferences()->count()
         ], 200);
     }

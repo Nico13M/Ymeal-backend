@@ -57,7 +57,11 @@ class RecipeService
                     'id' => $recipeIngredient->getIngredient()->getId(),
                     'name' => $recipeIngredient->getIngredient()->getName(),
                     'quantity' => $recipeIngredient->getQuantity(),
-                    'unit' => $recipeIngredient->getUnit(),
+                    'unit' => $recipeIngredient->getUnit() ? [
+                        'id' => $recipeIngredient->getUnit()->getId(),
+                        'name' => $recipeIngredient->getUnit()->getName(),
+                        'symbol' => $recipeIngredient->getUnit()->getSymbol(),
+                    ] : null,
                 ], $recipe->getRecipeIngredients()->toArray()),
             ],
 
@@ -92,7 +96,11 @@ class RecipeService
                 'id' => $recipeIngredient->getIngredient()->getId(),
                 'name' => $recipeIngredient->getIngredient()->getName(),
                 'quantity' => $recipeIngredient->getQuantity(),
-                'unit' => $recipeIngredient->getUnit(),
+                'unit' => $recipeIngredient->getUnit() ? [
+                    'id' => $recipeIngredient->getUnit()->getId(),
+                    'name' => $recipeIngredient->getUnit()->getName(),
+                    'symbol' => $recipeIngredient->getUnit()->getSymbol(),
+                ] : null,
             ], $recipe->getRecipeIngredients()->toArray()),
             
             'author' => $recipe->getUser()->getFirstname() . ' ' . $recipe->getUser()->getLastname(),

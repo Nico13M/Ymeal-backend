@@ -4,6 +4,7 @@ namespace App\Controller\Admin;
 use App\Entity\Diet;
 use App\Entity\Ingredient;
 use App\Entity\Recipe;
+use App\Entity\Units;
 use App\Repository\RecipeRepository;
 use App\Service\UserDataService;
 use App\Service\DataService;
@@ -138,7 +139,12 @@ class AdminRecipeController extends AbstractController
                     $recipeIngredient->setRecipe($recipe);
                     $recipeIngredient->setIngredient($ingredient);
                     $recipeIngredient->setQuantity((float) ($ingData['quantity'] ?? 0));
-                    $recipeIngredient->setUnit($ingData['unit'] ?? null);
+                    
+                    // Récupérer l'unité si fournie
+                    if (isset($ingData['unit_id'])) {
+                        $unit = $this->em->getRepository(Units::class)->find($ingData['unit_id']);
+                        $recipeIngredient->setUnit($unit);
+                    }
 
                     $recipe->addRecipeIngredient($recipeIngredient);
                     $this->em->persist($recipeIngredient);
@@ -316,7 +322,12 @@ class AdminRecipeController extends AbstractController
                 $recipeIngredient->setRecipe($recipe);
                 $recipeIngredient->setIngredient($ingredient);
                 $recipeIngredient->setQuantity((float) ($ingData['quantity'] ?? 0));
-                $recipeIngredient->setUnit($ingData['unit'] ?? null);
+                
+                // Récupérer l'unité si fournie
+                if (isset($ingData['unit_id'])) {
+                    $unit = $em->getRepository(Units::class)->find($ingData['unit_id']);
+                    $recipeIngredient->setUnit($unit);
+                }
 
                 $recipe->addRecipeIngredient($recipeIngredient);
                 $em->persist($recipeIngredient);

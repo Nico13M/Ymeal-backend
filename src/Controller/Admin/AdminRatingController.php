@@ -141,7 +141,7 @@ class AdminRatingController extends AbstractController
         }
 
         // Validation
-        if (!isset($data['rating'])) {
+        if (!array_key_exists('rating', $data)) {
             return $this->jsonWithUserId(['error' => "Le champ 'rating' est obligatoire", 'received_data' => $data], 400);
         }
 

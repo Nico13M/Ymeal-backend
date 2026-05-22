@@ -33,6 +33,9 @@ class RecipeService
             'dish_type' => $recipe->getDishType(), // pasta, salad, etc.
             'is_public' => $recipe->isPublic(), // Visibilité publique
 
+            // ============= ÉTAPES DE PRÉPARATION =============
+            'steps' => $recipe->getSteps() ?? [], // Étapes de préparation
+
             // ============= TIMESTAMPS =============
             'timestamps' => [
                 'created_at' => $recipe->getCreatedAt()?->format('Y-m-d H:i:s'),

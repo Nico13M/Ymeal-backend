@@ -117,6 +117,7 @@ class AdminRecipeController extends AbstractController
             if (isset($data['difficulty'])) $recipe->setDifficulty($data['difficulty']);
             if (isset($data['dish_type'])) $recipe->setDishType($data['dish_type']);
             if (isset($data['image'])) $recipe->setImage($data['image']);
+            if (isset($data['steps']) && is_array($data['steps'])) $recipe->setSteps($data['steps']);
 
             // Ajouter les régimes alimentaires
             if (isset($data['diet_ids']) && is_array($data['diet_ids'])) {
@@ -291,6 +292,7 @@ class AdminRecipeController extends AbstractController
         if (isset($data['dish_type'])) $recipe->setDishType($data['dish_type']);
         if (isset($data['image'])) $recipe->setImage($data['image']);
         if (isset($data['is_public'])) $recipe->setIsPublic((bool) $data['is_public']);
+        if (isset($data['steps']) && is_array($data['steps'])) $recipe->setSteps($data['steps']);
 
         // Modifier les régimes
         if (isset($data['diet_ids'])) {

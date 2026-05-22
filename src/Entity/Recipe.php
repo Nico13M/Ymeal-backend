@@ -64,6 +64,11 @@ class Recipe
     #[ORM\Column]
     private ?bool $is_public = null; // Visible publiquement ou non
 
+    // ============= ÉTAPES DE PRÉPARATION =============
+
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $steps = null; // Étapes de préparation
+
     // ============= RELATIONS =============
 
     #[ORM\ManyToOne]
@@ -118,6 +123,8 @@ class Recipe
     public function setDishType(?string $dishType): static { $this->dishType = $dishType; return $this; }
     public function isPublic(): ?bool { return $this->is_public; }
     public function setIsPublic(bool $is_public): static { $this->is_public = $is_public; return $this; }
+    public function getSteps(): ?array { return $this->steps; }
+    public function setSteps(?array $steps): static { $this->steps = $steps; return $this; }
     public function getUser(): ?User { return $this->user; }
     public function setUser(?User $user): static { $this->user = $user; return $this; }
 

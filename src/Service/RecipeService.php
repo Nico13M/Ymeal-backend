@@ -124,7 +124,10 @@ class RecipeService
             'description' => $recipe->getDescription(),
             'servings' => $recipe->getServings(),
             'difficulty' => $recipe->getDifficulty(),
-            
+             'timestamps' => [
+                'created_at' => $recipe->getCreatedAt()?->format('Y-m-d H:i:s'),
+                'updated_at' => $recipe->getUpdatedAt()?->format('Y-m-d H:i:s'),
+            ],
             'timing' => [
                 'duration' => $recipe->getDuration(),
                 'prep_time' => $recipe->getTime(),

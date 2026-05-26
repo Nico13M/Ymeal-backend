@@ -114,18 +114,9 @@ class RecipeService
      * 📋 Sérialise une recette en version MINIMALISTE (pour les listes /search, /favorites)
      * Utilisé pour les listes - données réduites pour performancer
      */
-  public function serializeRecipeMinimal(Recipe $recipe): array
+    public function serializeRecipeMinimal(Recipe $recipe): array
     {
-        $ratings = $recipe->getRatings()->toArray();
-
-        $ratingsCount = count($ratings);
-
-        $averageRating = $ratingsCount > 0
-            ? array_sum(array_map(
-                fn($rating) => $rating->getRating(),
-                $ratings
-            )) / $ratingsCount
-            : 0;
+                $ratingStats = $this->ratingRepository->getStatsForRecipe($recipe);
 
         return [
             'id' => $recipe->getId(),
@@ -163,8 +154,8 @@ class RecipeService
 
             'ratings' => [
                 'stats' => [
-                    'average' => round($averageRating, 1),
-                    'count' => $ratingsCount,
+                    'average' => round((float) ($ratingStats['average'] ?? 0), 1),
+                    'count' => (int) ($ratingStats['count'] ?? 0),
                 ]
             ],
         ];

@@ -270,6 +270,40 @@ class AdminRecipeController extends AbstractController
         }
     }
 
+    /**
+     * GET /admin/recipes/trending
+     * Récupérer les recettes tendances sur les 7 derniers jours.
+     */
+    #[Route('/trending', name: 'trending', methods: ['GET'])]
+    public function trending(Request $request, RecipeRepository $recipeRepository): Response
+    {
+        if ($err = $this->userManager->ensureAuthenticated($request)) {
+            return $err;
+        }
+
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $since = new \DateTimeImmutable('-7 days');
+        $recipes = $recipeRepository->findTrendingRecipesSince($since);
+
+        $data = array_map(
+            fn(Recipe $recipe) => $this->recipeService->serializeRecipeMinimal($recipe),
+            $recipes
+        );
+
+        return $this->jsonWithUserId([
+            'window' => [
+                'days' => 7,
+                'since' => $since->format(\DateTimeInterface::ATOM),
+            ],
+            'recipes' => $data,
+            'total_results' => count($data),
+        ]);
+    }
+
     // ============= ROUTES GÉNÉRIQUES (APRÈS {id}) =============
     // Ces routes DOIVENT être après les routes spécifiques!
 

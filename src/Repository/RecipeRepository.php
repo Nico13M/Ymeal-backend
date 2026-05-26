@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\Rating;
 use App\Entity\Recipe;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -99,5 +100,54 @@ class RecipeRepository extends ServiceEntityRepository
         }
 
         return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Retourne les recettes publiques classées par activité récente sur les avis.
+     *
+     * Le tri priorise le nombre d'avis créés depuis $since. Si une recette n'a
+     * aucun avis récent, le tri retombe naturellement sur la moyenne globale.
+     *
+     * @return Recipe[]
+     */
+    public function findTrendingRecipesSince(\DateTimeInterface $since): array
+    {
+        $rows = $this->createQueryBuilder('r')
+            ->select('r.id AS id')
+            ->leftJoin(Rating::class, 'rating', 'WITH', 'rating.recipe = r')
+            ->where('r.is_public = true')
+            ->groupBy('r.id')
+            ->addSelect('SUM(CASE WHEN rating.createdAt >= :since THEN 1 ELSE 0 END) AS recentRatingCount')
+            ->addSelect('COALESCE(AVG(rating.rating), 0) AS averageRating')
+            ->orderBy('recentRatingCount', 'DESC')
+            ->addOrderBy('averageRating', 'DESC')
+            ->setParameter('since', $since)
+            ->getQuery()
+            ->getArrayResult();
+
+        if (empty($rows)) {
+            return [];
+        }
+
+        $recipeIds = array_map(
+            static fn(array $row) => (int) $row['id'],
+            $rows
+        );
+
+        $recipes = $this->findBy(['id' => $recipeIds]);
+        $recipesById = [];
+
+        foreach ($recipes as $recipe) {
+            $recipesById[$recipe->getId()] = $recipe;
+        }
+
+        $orderedRecipes = [];
+        foreach ($recipeIds as $recipeId) {
+            if (isset($recipesById[$recipeId])) {
+                $orderedRecipes[] = $recipesById[$recipeId];
+            }
+        }
+
+        return $orderedRecipes;
     }
 }

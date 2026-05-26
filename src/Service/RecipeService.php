@@ -114,8 +114,19 @@ class RecipeService
      * 📋 Sérialise une recette en version MINIMALISTE (pour les listes /search, /favorites)
      * Utilisé pour les listes - données réduites pour performancer
      */
-    public function serializeRecipeMinimal(Recipe $recipe): array
+  public function serializeRecipeMinimal(Recipe $recipe): array
     {
+        $ratings = $recipe->getRatings()->toArray();
+
+        $ratingsCount = count($ratings);
+
+        $averageRating = $ratingsCount > 0
+            ? array_sum(array_map(
+                fn($rating) => $rating->getRating(),
+                $ratings
+            )) / $ratingsCount
+            : 0;
+
         return [
             'id' => $recipe->getId(),
             'name' => $recipe->getName(),
@@ -124,15 +135,17 @@ class RecipeService
             'description' => $recipe->getDescription(),
             'servings' => $recipe->getServings(),
             'difficulty' => $recipe->getDifficulty(),
-             'timestamps' => [
+
+            'timestamps' => [
                 'created_at' => $recipe->getCreatedAt()?->format('Y-m-d H:i:s'),
                 'updated_at' => $recipe->getUpdatedAt()?->format('Y-m-d H:i:s'),
             ],
+
             'timing' => [
                 'duration' => $recipe->getDuration(),
                 'prep_time' => $recipe->getTime(),
             ],
-            
+
             'ingredients' => array_map(fn($recipeIngredient) => [
                 'id' => $recipeIngredient->getIngredient()->getId(),
                 'name' => $recipeIngredient->getIngredient()->getName(),
@@ -143,9 +156,17 @@ class RecipeService
                     'symbol' => $recipeIngredient->getUnit()->getSymbol(),
                 ] : null,
             ], $recipe->getRecipeIngredients()->toArray()),
-            
+
             'author' => $recipe->getUser()->getFirstname() . ' ' . $recipe->getUser()->getLastname(),
+
             'favorites_count' => $recipe->getUserRecipePreferences()?->count() ?? 0,
+
+            'ratings' => [
+                'stats' => [
+                    'average' => round($averageRating, 1),
+                    'count' => $ratingsCount,
+                ]
+            ],
         ];
     }
 }

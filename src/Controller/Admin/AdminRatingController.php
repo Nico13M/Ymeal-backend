@@ -129,15 +129,26 @@ class AdminRatingController extends AbstractController
         }
 
         // Récupérer les données du JSON
-        try {
+       try {
             $data = $request->toArray();
         } catch (\Exception $e) {
-            // Fallback si toArray() échoue
             $content = $request->getContent();
+
             if (empty($content)) {
-                return $this->jsonWithUserId(['error' => 'Aucune donnée envoyée. Assurez-vous que Content-Type: application/json est défini', 'received' => ''], 400);
+                return $this->jsonWithUserId([
+                    'error' => 'Aucune donnée envoyée'
+                ], 400);
             }
-            $data = json_decode($content, true) ?? [];
+
+            $data = json_decode($content, true);
+
+            if (!is_array($data)) {
+                return $this->jsonWithUserId([
+                    'error' => 'JSON invalide',
+                    'received' => $content,
+                    'decoded_type' => gettype($data),
+                ], 400);
+            }
         }
 
         // Validation

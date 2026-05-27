@@ -89,15 +89,7 @@ class AdminFrigoController extends AbstractController
         }
 
         $ingredients = $ingredientRepository->ingredientFindByName($query);
-        return $this->json(
-            array_map(
-                fn ($ingredient) => [
-                    'id' => $ingredient->getId(),
-                    'name' => $ingredient->getName(),
-                ],
-                $ingredients
-            )
-        );
+        return $this->json($ingredients);
     }
     // --- 1. LISTER LES INGRÉDIENTS DU FRIGO ---
     #[Route('/', name: 'index', methods: ['GET'])]

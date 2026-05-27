@@ -18,17 +18,19 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use App\Entity\User;
+use App\Service\IngredientMatcherService;
 
 #[Route('/admin/recipes', name: 'admin_recipe_')]
 class AdminRecipeController extends AbstractController
 {
     public function __construct(
-        private UserManager $userManager, // Gestion de l'authentification
-        private RecipeService $recipeService, // Sérialisation des recettes
-        private UserDataService $userDataService, // Données utilisateur
-        private DataService $dataService, // Envoi de données
-        private RecipeSearchService $recipeSearchService, // Recherche avancée
-        private EntityManagerInterface $em // ORM Doctrine
+        private UserManager $userManager,
+        private RecipeService $recipeService,
+        private UserDataService $userDataService,
+        private DataService $dataService,
+        private RecipeSearchService $recipeSearchService,
+        private EntityManagerInterface $em,
+        private IngredientMatcherService $ingredientMatcher,
     ) {}
 
     /**
@@ -182,6 +184,24 @@ class AdminRecipeController extends AbstractController
 
                     $recipe->addRecipeIngredient($recipeIngredient);
                     $this->em->persist($recipeIngredient);
+                }
+            }
+
+            // Matching automatique des ingrédients depuis le texte IA
+            // (uniquement quand aucun ingrédient explicite n'est fourni dans la requête)
+            if (empty($data['ingredients']) && !empty($data['description'])) {
+                $matches = $this->ingredientMatcher->matchFromText($data['description']);
+                foreach ($matches as $match) {
+                    if (!$match['ingredient']) {
+                        continue;
+                    }
+                    $ri = new \App\Entity\RecipeIngredient();
+                    $ri->setRecipe($recipe);
+                    $ri->setIngredient($match['ingredient']);
+                    $ri->setQuantity((int) round($match['quantity']));
+                    $ri->setUnitLabel($match['unit'] ?: null);
+                    $recipe->addRecipeIngredient($ri);
+                    $this->em->persist($ri);
                 }
             }
 

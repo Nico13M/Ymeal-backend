@@ -69,8 +69,15 @@ class RecipeService
                         'id' => $recipeIngredient->getUnit()->getId(),
                         'name' => $recipeIngredient->getUnit()->getName(),
                         'symbol' => $recipeIngredient->getUnit()->getSymbol(),
-                    ] : null,
+                    ] : $recipeIngredient->getUnitLabel(),
+                    'macros' => [
+                        'energy_kcal'     => $recipeIngredient->getIngredient()->getEnergy100g(),
+                        'proteins_g'      => $recipeIngredient->getIngredient()->getProteins100g(),
+                        'carbohydrates_g' => $recipeIngredient->getIngredient()->getCarbohydrates100g(),
+                        'fat_g'           => $recipeIngredient->getIngredient()->getFat100g(),
+                    ],
                 ], $recipe->getRecipeIngredients()->toArray()),
+                'totals' => $this->computeNutritionTotals($recipe),
             ],
 
             // ============= ENGAGEMENT =============
@@ -158,6 +165,27 @@ class RecipeService
                     'count' => (int) ($ratingStats['count'] ?? 0),
                 ]
             ],
+        ];
+    }
+
+    private function computeNutritionTotals(Recipe $recipe): array
+    {
+        $kcal = $proteins = $carbs = $fat = 0.0;
+
+        foreach ($recipe->getRecipeIngredients() as $ri) {
+            $ing = $ri->getIngredient();
+            $qty = $ri->getQuantity() ?? 0;
+            $kcal     += ($ing->getEnergy100g()        ?? 0) * $qty / 100;
+            $proteins += ($ing->getProteins100g()       ?? 0) * $qty / 100;
+            $carbs    += ($ing->getCarbohydrates100g()  ?? 0) * $qty / 100;
+            $fat      += ($ing->getFat100g()            ?? 0) * $qty / 100;
+        }
+
+        return [
+            'energy_kcal'     => round($kcal),
+            'proteins_g'      => round($proteins, 1),
+            'carbohydrates_g' => round($carbs, 1),
+            'fat_g'           => round($fat, 1),
         ];
     }
 }

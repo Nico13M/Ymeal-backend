@@ -64,6 +64,26 @@ class IngredientRepository extends ServiceEntityRepository
     //    }
 
     /**
+     * Retourne l'ingrédient dont le nom est le plus similaire par trigramme pg_trgm.
+     * Requiert CREATE EXTENSION pg_trgm sur la base de données.
+     */
+    public function findBySimilarity(string $name, float $threshold = 0.25): ?Ingredient
+    {
+        $sql = "
+            SELECT id
+            FROM ingredient
+            WHERE similarity(LOWER(name), LOWER(:name)) > :threshold
+            ORDER BY similarity(LOWER(name), LOWER(:name)) DESC
+            LIMIT 1
+        ";
+
+        $conn   = $this->getEntityManager()->getConnection();
+        $result = $conn->fetchOne($sql, ['name' => $name, 'threshold' => $threshold]);
+
+        return $result ? $this->find((int) $result) : null;
+    }
+
+    /**
      * @param array $ids
      * @return Ingredient[]
      */

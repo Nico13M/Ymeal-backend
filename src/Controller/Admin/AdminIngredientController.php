@@ -58,19 +58,16 @@ class AdminIngredientController extends AbstractController
         CsrfService $csrfService,
         IngredientService $ingredientService
     ): Response {
-        // 🔒 1. Auth
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
         }
 
-        // 🔒 2. CSRF (Vérifie que la requête vient bien de ton app)
         $csrfToken = $request->headers->get('X-CSRF-TOKEN');
         if (!$csrfService->isValid('api', $csrfToken)) {
             return $this->json(['error' => 'Invalid CSRF token'], Response::HTTP_FORBIDDEN);
         }
 
         $data = json_decode($request->getContent(), true);
-
         $result = $ingredientService->createIngredient($data);
         if ($result instanceof JsonResponse) {
             return $result;
@@ -88,7 +85,6 @@ class AdminIngredientController extends AbstractController
         CsrfService $csrfService,
         IngredientService $ingredientService
     ): Response {
-        // 🔒 Auth & CSRF
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
         }
@@ -116,7 +112,6 @@ class AdminIngredientController extends AbstractController
         CsrfService $csrfService,
         IngredientService $ingredientService
     ): JsonResponse {
-        // 🔒 Auth & CSRF
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
         }

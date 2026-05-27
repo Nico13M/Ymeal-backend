@@ -76,7 +76,7 @@ class AdminFrigoController extends AbstractController
     }  
 
     #[Route('/ingredients/search', name: 'search_ingredients', methods: ['GET'])]
-    public function searchIngredients(Request $request): JsonResponse
+    public function searchIngredients(Request $request, IngredientRepository $ingredientRepository): JsonResponse
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
@@ -88,14 +88,7 @@ class AdminFrigoController extends AbstractController
             return $this->json([]);
         }
 
-        $ingredients = $this->ingredientRepository
-            ->createQueryBuilder('i')
-            ->where('LOWER(i.name) LIKE LOWER(:query)')
-            ->setParameter('query', '%' . $query . '%')
-            ->setMaxResults(20)
-            ->getQuery()
-            ->getResult();
-
+        $ingredients = $ingredientRepository->ingredientFindByName($query);
         return $this->json(
             array_map(
                 fn ($ingredient) => [

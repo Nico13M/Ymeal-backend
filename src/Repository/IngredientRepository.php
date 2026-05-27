@@ -15,6 +15,7 @@ class IngredientRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, Ingredient::class);
     }
+    
     public function ingredientFindOnly10(): array
     {
         return $this->createQueryBuilder('i')
@@ -24,6 +25,19 @@ class IngredientRepository extends ServiceEntityRepository
                 ->getQuery()
                 ->getArrayResult();
     }
+    
+    public function ingredientFindByName(string $name): array
+    {
+        return $this->createQueryBuilder('i')
+            ->select('i.id', 'i.name', 'i.slug')
+            ->where('LOWER(i.name) LIKE LOWER(:name)')
+            ->setParameter('name', '%' . $name . '%')
+            ->orderBy('i.name', 'ASC')
+            ->setMaxResults(10)
+            ->getQuery()
+            ->getArrayResult();
+    }
+
     //    /**
     //     * @return Ingredient[] Returns an array of Ingredient objects
     //     */

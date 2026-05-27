@@ -95,6 +95,8 @@ class IngredientService
             'id' => $ingredient->getId(),
             'name' => $ingredient->getName(),
             'slug' => $ingredient->getSlug(),
+            'image' => $ingredient->getImageSmallUrl(),
+            'category' => $ingredient->getCategoriesTags(),
             'units' => $ingredient->getUnits() ? [
                 'id' => $ingredient->getUnits()->getId(),
                 'name' => $ingredient->getUnits()->getName(),

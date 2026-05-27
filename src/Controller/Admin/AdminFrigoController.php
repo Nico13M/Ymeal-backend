@@ -65,23 +65,14 @@ class AdminFrigoController extends AbstractController
     }
 
     // --- 0. LISTER TOUS LES INGRÉDIENTS DISPONIBLES ---
-    #[Route('/ingredients', name: 'list_ingredients', methods: ['GET'])]
     public function listIngredients(Request $request, IngredientRepository $ingredientRepository): Response
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
         }
 
-        $data = array_map(fn(Ingredient $i) => [
-            'id'   => $i->getId(),
-            'name' => $i->getName(),
-            'category' => $i->getCategoriesTags(),
-            'image' => $i->getImageSmallUrl(),
-            'slug' => $i->getSlug(),
-        ], $ingredientRepository->findAll());
-
-        return $this->json($data);
-    }
+        return $this->json($ingredientRepository->ingredientFindOnly10());
+    }  
 
     // --- 1. LISTER LES INGRÉDIENTS DU FRIGO ---
     #[Route('/', name: 'index', methods: ['GET'])]

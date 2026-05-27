@@ -53,6 +53,7 @@ class AdminAuthController extends AbstractController
                     'email' => $user->getEmail(),
                     'firstName' => $user->getFirstName(),
                     'pseudo' => $user->getPseudo(),
+                    'createdAt' => $user->getCreatedAt()->format('Y-m-d H:i:s'),
                     'lastName' => $user->getLastName(),
                 ],
             ],

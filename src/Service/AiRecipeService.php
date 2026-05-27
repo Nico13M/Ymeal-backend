@@ -13,7 +13,7 @@ class AiRecipeService
 
     public function generateRecipe(array $payload): array
     {
-        // En prod (Scalingo), il faudra mettre l'URL de l'API Python en variable d'environnement.
+        // !!!!!!!!!!!!!!!!!!!
         $pythonApiUrl = $_ENV['PYTHON_API_URL'] ?? 'http://127.0.0.1:8001/api/predict';
 
         try {

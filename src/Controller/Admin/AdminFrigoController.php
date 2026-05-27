@@ -75,6 +75,8 @@ class AdminFrigoController extends AbstractController
         $data = array_map(fn(Ingredient $i) => [
             'id'   => $i->getId(),
             'name' => $i->getName(),
+            'category' => $i->getCategoriesTags(),
+            'image' => $i->getImageSmallUrl(),
             'slug' => $i->getSlug(),
         ], $ingredientRepository->findAll());
 

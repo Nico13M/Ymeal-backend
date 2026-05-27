@@ -65,6 +65,7 @@ class AdminFrigoController extends AbstractController
     }
 
     // --- 0. LISTER TOUS LES INGRÉDIENTS DISPONIBLES ---
+    #[Route('/ingredients', name: 'list_ingredients', methods: ['GET'])]
     public function listIngredients(Request $request, IngredientRepository $ingredientRepository): Response
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {

@@ -190,6 +190,52 @@ class AdminRecipeController extends AbstractController
     }
 
     /**
+     * POST /admin/recipes/generate
+     * Générer une recette via l'IA
+     */
+    #[Route('/generate', name: 'generate', methods: ['POST'])]
+    public function generate(
+        Request $request, 
+        \App\Service\AiRecipeService $aiService, 
+        \App\Service\CsrfService $csrfService
+    ): Response {
+        
+        if ($err = $this->userManager->ensureAuthenticated($request)) {
+            return $err;
+        }
+
+        $csrfToken = $request->headers->get('X-CSRF-TOKEN');
+        if (!$csrfService->isValid('api', $csrfToken)) {
+            return $this->json(['error' => 'Invalid CSRF token'], 403);
+        }
+
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Non authentifié'], 401);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+
+        if (empty($data['ingredient_search']) && empty($data['ingredients_selected'])) {
+            return $this->json([
+                'success' => false,
+                'error' => 'Veuillez fournir au moins un ingrédient.'
+            ], 400);
+        }
+
+        try {
+            $result = $aiService->generateRecipe($data);
+            return $this->jsonWithUserId($result, 200);
+
+        } catch (\Exception $e) {
+            return $this->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 502);
+        }
+    }
+
+    /**
      * GET /admin/recipes/user/blacklist
      * Récupérer la liste noire des ingrédients de l'utilisateur
      */
@@ -515,5 +561,6 @@ class AdminRecipeController extends AbstractController
         return $this->jsonWithUserId([
             'count' => $count,
             'filters' => $criteria ? array_keys($criteria) : []
-        ]);}
+        ]);
     }
+}

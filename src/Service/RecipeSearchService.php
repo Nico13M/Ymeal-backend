@@ -136,12 +136,12 @@ class RecipeSearchService
         $formIngredients = [];
 
         if ($frigo && $user->getFrigo()) {
-            $frigoIngredients = $user->getFrigo()->getIngredientsHasFrigo()
-                ->map(fn($ingredient) => [
-                    'id' => $ingredient->getId(),
-                    'name' => $ingredient->getName()
-                ])
-                ->toArray();
+            $frigoIngredients = $user->getFrigo()->getFrigoIngredients()
+            ->map(fn($frigoIngredient) => [
+                'id' => $frigoIngredient->getIngredient()->getId(),
+                'name' => $frigoIngredient->getIngredient()->getName()
+            ])
+            ->toArray();
         }
 
         $ingredientsFormParam = $request->query->get('ingredientsForm', '');

@@ -125,11 +125,24 @@ class AdminRecipeController extends AbstractController
             $recipe = new Recipe();
             $recipe->setName($data['name']);
             $recipe->setDescription($data['description']);
+
+            // Slug fallback si Gedmo Sluggable ne fire pas en production
+            if (empty($data['slug'])) {
+                $slug = mb_strtolower($data['name'], 'UTF-8');
+                $slug = strtr($slug, ['à'=>'a','â'=>'a','é'=>'e','è'=>'e','ê'=>'e','ë'=>'e',
+                                       'î'=>'i','ï'=>'i','ô'=>'o','ù'=>'u','û'=>'u','ü'=>'u','ç'=>'c']);
+                $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+                $slug = trim($slug, '-') . '-' . substr(uniqid(), -6);
+                $recipe->setSlug($slug);
+            } else {
+                $recipe->setSlug($data['slug']);
+            }
             $recipe->setServings((int) $data['servings']);
             $recipe->setIsPublic((bool) $data['is_public']);
             $recipe->setUser($user); // Lier à l'auteur
 
             // Champs optionnels
+            if (isset($data['slug'])) $recipe->setSlug($data['slug']);
             if (isset($data['duration'])) $recipe->setDuration((int) $data['duration']);
             if (isset($data['time'])) $recipe->setTime((int) $data['time']);
             if (isset($data['difficulty'])) $recipe->setDifficulty($data['difficulty']);

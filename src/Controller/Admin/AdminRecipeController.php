@@ -34,6 +34,15 @@ class AdminRecipeController extends AbstractController
     /**
      * Retourne une réponse JSON avec le header X-User-Id
      */
+    private function buildSlug(string $name): string
+    {
+        $slug = mb_strtolower($name, 'UTF-8');
+        $slug = strtr($slug, ['à'=>'a','â'=>'a','é'=>'e','è'=>'e','ê'=>'e','ë'=>'e',
+                               'î'=>'i','ï'=>'i','ô'=>'o','ù'=>'u','û'=>'u','ü'=>'u','ç'=>'c']);
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+        return trim($slug, '-') . '-' . substr(uniqid(), -6);
+    }
+
     private function jsonWithUserId($data, int $statusCode = 200): Response
     {
         $response = $this->json($data, $statusCode);
@@ -125,29 +134,17 @@ class AdminRecipeController extends AbstractController
             $recipe = new Recipe();
             $recipe->setName($data['name']);
             $recipe->setDescription($data['description']);
-
-            // Slug fallback si Gedmo Sluggable ne fire pas en production
-            if (empty($data['slug'])) {
-                $slug = mb_strtolower($data['name'], 'UTF-8');
-                $slug = strtr($slug, ['à'=>'a','â'=>'a','é'=>'e','è'=>'e','ê'=>'e','ë'=>'e',
-                                       'î'=>'i','ï'=>'i','ô'=>'o','ù'=>'u','û'=>'u','ü'=>'u','ç'=>'c']);
-                $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
-                $slug = trim($slug, '-') . '-' . substr(uniqid(), -6);
-                $recipe->setSlug($slug);
-            } else {
-                $recipe->setSlug($data['slug']);
-            }
             $recipe->setServings((int) $data['servings']);
             $recipe->setIsPublic((bool) $data['is_public']);
-            $recipe->setUser($user); // Lier à l'auteur
+            $recipe->setUser($user);
 
             // Gedmo Sluggable et Timestampable ne se déclenchent pas sur Scalingo
-            if (isset($data['slug'])) $recipe->setSlug($data['slug']);
+            $slug = !empty($data['slug']) ? $data['slug'] : $this->buildSlug($data['name']);
+            $recipe->setSlug($slug);
             $recipe->setCreatedAt(new \DateTime());
             $recipe->setUpdatedAt(new \DateTime());
 
             // Champs optionnels
-            if (isset($data['slug'])) $recipe->setSlug($data['slug']);
             if (isset($data['duration'])) $recipe->setDuration((int) $data['duration']);
             if (isset($data['time'])) $recipe->setTime((int) $data['time']);
             if (isset($data['difficulty'])) $recipe->setDifficulty($data['difficulty']);

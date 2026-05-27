@@ -141,6 +141,11 @@ class AdminRecipeController extends AbstractController
             $recipe->setIsPublic((bool) $data['is_public']);
             $recipe->setUser($user); // Lier à l'auteur
 
+            // Gedmo Sluggable et Timestampable ne se déclenchent pas sur Scalingo
+            if (isset($data['slug'])) $recipe->setSlug($data['slug']);
+            $recipe->setCreatedAt(new \DateTime());
+            $recipe->setUpdatedAt(new \DateTime());
+
             // Champs optionnels
             if (isset($data['slug'])) $recipe->setSlug($data['slug']);
             if (isset($data['duration'])) $recipe->setDuration((int) $data['duration']);

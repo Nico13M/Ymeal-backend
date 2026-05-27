@@ -87,7 +87,8 @@ class AdminRecipeController extends AbstractController
 
         // Appeler le service de recherche
         $result = $this->recipeSearchService->searchRecipes($user, $request);
-
+dump($result);
+dd($result['data']);
         return $this->jsonWithUserId($result['data'], 200);
     }
 

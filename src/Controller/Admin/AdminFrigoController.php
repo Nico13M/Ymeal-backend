@@ -75,6 +75,37 @@ class AdminFrigoController extends AbstractController
         return $this->json($ingredientRepository->ingredientFindOnly10());
     }  
 
+    #[Route('/ingredients/search', name: 'search_ingredients', methods: ['GET'])]
+    public function searchIngredients(Request $request): JsonResponse
+    {
+        if ($err = $this->userManager->ensureAuthenticated($request)) {
+            return $err;
+        }
+
+        $query = trim((string) $request->query->get('query', ''));
+
+        if ($query === '') {
+            return $this->json([]);
+        }
+
+        $ingredients = $this->ingredientRepository
+            ->createQueryBuilder('i')
+            ->where('LOWER(i.name) LIKE LOWER(:query)')
+            ->setParameter('query', '%' . $query . '%')
+            ->setMaxResults(20)
+            ->getQuery()
+            ->getResult();
+
+        return $this->json(
+            array_map(
+                fn ($ingredient) => [
+                    'id' => $ingredient->getId(),
+                    'name' => $ingredient->getName(),
+                ],
+                $ingredients
+            )
+        );
+    }
     // --- 1. LISTER LES INGRÉDIENTS DU FRIGO ---
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request, EntityManagerInterface $em, UserRepository $userRepository): Response

@@ -64,8 +64,28 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     #[ORM\Column(length: 45)]
     private ?string $pseudo = null;
 
+    #[ORM\OneToOne(mappedBy: 'user', cascade: ['persist', 'remove'])]
+    private ?MonthlyBudget $monthlyBudget = null;
+
+    #[ORM\OneToOne(mappedBy: 'user', cascade: ['persist', 'remove'])]
+    private ?UserPersonCount $personCount = null;
+
+    /**
+     * @var Collection<int, FavoriteCuisine>
+     */
+    #[ORM\ManyToMany(targetEntity: FavoriteCuisine::class, inversedBy: 'users')]
+    private Collection $favoriteCuisines;
+
+    /**
+     * @var Collection<int, Allergy>
+     */
+    #[ORM\ManyToMany(targetEntity: Allergy::class, inversedBy: 'users')]
+    private Collection $allergies;
+
     public function __construct()
     {
+        $this->favoriteCuisines = new ArrayCollection();
+        $this->allergies = new ArrayCollection();
         $this->userSubscriptions = new ArrayCollection();
         $this->diets = new ArrayCollection();
         $this->user_ingredients_blacklist = new ArrayCollection();
@@ -282,6 +302,55 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     {
         $this->pseudo = $pseudo;
 
+        return $this;
+    }
+
+
+    public function getMonthlyBudget(): ?MonthlyBudget { return $this->monthlyBudget; }
+    public function setMonthlyBudget(?MonthlyBudget $monthlyBudget): static
+    {
+        if ($monthlyBudget !== null && $monthlyBudget->getUser() !== $this) {
+            $monthlyBudget->setUser($this);
+        }
+        $this->monthlyBudget = $monthlyBudget;
+        return $this;
+    }
+
+    public function getPersonCount(): ?UserPersonCount { return $this->personCount; }
+    public function setPersonCount(?UserPersonCount $personCount): static
+    {
+        if ($personCount !== null && $personCount->getUser() !== $this) {
+            $personCount->setUser($this);
+        }
+        $this->personCount = $personCount;
+        return $this;
+    }
+
+    public function getFavoriteCuisines(): Collection { return $this->favoriteCuisines; }
+    public function addFavoriteCuisine(FavoriteCuisine $cuisine): static
+    {
+        if (!$this->favoriteCuisines->contains($cuisine)) {
+            $this->favoriteCuisines->add($cuisine);
+        }
+        return $this;
+    }
+    public function removeFavoriteCuisine(FavoriteCuisine $cuisine): static
+    {
+        $this->favoriteCuisines->removeElement($cuisine);
+        return $this;
+    }
+
+    public function getAllergies(): Collection { return $this->allergies; }
+    public function addAllergy(Allergy $allergy): static
+    {
+        if (!$this->allergies->contains($allergy)) {
+            $this->allergies->add($allergy);
+        }
+        return $this;
+    }
+    public function removeAllergy(Allergy $allergy): static
+    {
+        $this->allergies->removeElement($allergy);
         return $this;
     }
 }

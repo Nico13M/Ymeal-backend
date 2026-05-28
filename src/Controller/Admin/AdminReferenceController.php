@@ -12,6 +12,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use App\Repository\BudgetRepository;
 
 #[Route('/admin/reference', name: 'admin_reference_')]
 class AdminReferenceController extends AbstractController
@@ -88,7 +89,7 @@ class AdminReferenceController extends AbstractController
             'name' => $i->getName(),
         ], $ingredients));
     }
-    
+
     #[Route('/budgets', name: 'budgets', methods: ['GET'])]
     public function getBudgets(Request $request, BudgetRepository $budgetRepository): Response
     {

@@ -20,18 +20,13 @@ class MonthlyBudget
     #[ORM\JoinColumn(nullable: false)]
     private ?User $user = null;
 
-    #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
-    private ?string $amount = null; // string car DECIMAL Doctrine
-
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: true)]
     private ?Budget $budget = null;
 
-    public function getBudget(): ?Budget { return $this->budget; }
-    public function setBudget(?Budget $budget): static { $this->budget = $budget; return $this; }
     public function getId(): ?int { return $this->id; }
     public function getUser(): ?User { return $this->user; }
     public function setUser(?User $user): static { $this->user = $user; return $this; }
-    public function getAmount(): ?string { return $this->amount; }
-    public function setAmount(string $amount): static { $this->amount = $amount; return $this; }
+    public function getBudget(): ?Budget { return $this->budget; }
+    public function setBudget(?Budget $budget): static { $this->budget = $budget; return $this; }
 }

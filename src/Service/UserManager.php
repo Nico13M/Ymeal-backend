@@ -24,6 +24,10 @@ class UserManager
 
     public function ensureAuthenticated(Request $request): ?JsonResponse
     {
+        if ($request->getMethod() === 'OPTIONS') {
+        return null;
+     }
+
         // Simple token-based check for APIs. Configure env var API_TOKEN.
         $expected = $_ENV['API_TOKEN'] ?? getenv('API_TOKEN');
 

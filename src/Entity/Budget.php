@@ -2,6 +2,7 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use App\Repository\BudgetRepository;
 
 #[ORM\Entity(repositoryClass: BudgetRepository::class)]
 class Budget

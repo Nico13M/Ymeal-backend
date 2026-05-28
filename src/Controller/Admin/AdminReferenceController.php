@@ -23,6 +23,14 @@ class AdminReferenceController extends AbstractController
         $this->userManager = $userManager;
     }
 
+    private function jsonWithUserId($data): Response
+    {
+        $userId = $this->getUser()?->getId();
+        return $this->json([
+            'data' => $data,
+            'userId' => $userId,
+        ]);
+    }
     // ============= DIETS =============
 
     #[Route('/diets', name: 'diets', methods: ['GET'])]

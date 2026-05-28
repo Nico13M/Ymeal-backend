@@ -16,7 +16,13 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 #[Route('/admin/reference', name: 'admin_reference_')]
 class AdminReferenceController extends AbstractController
 {
-        
+    private UserManager $userManager;
+
+    public function __construct(UserManager $userManager)
+    {
+        $this->userManager = $userManager;
+    }
+
     // ============= DIETS =============
 
     #[Route('/diets', name: 'diets', methods: ['GET'])]

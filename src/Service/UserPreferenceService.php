@@ -10,6 +10,7 @@ use App\Entity\MonthlyBudget;
 use App\Entity\User;
 use App\Entity\UserPersonCount;
 use Doctrine\ORM\EntityManagerInterface;
+use App\Entity\Budget;
 
 class UserPreferenceService
 {

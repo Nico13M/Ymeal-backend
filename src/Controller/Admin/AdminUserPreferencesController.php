@@ -5,6 +5,7 @@ namespace App\Controller\Admin;
 use App\Entity\User;
 use App\Service\UserPreferenceService;
 use Symfony\Component\HttpFoundation\Request;
+use App\Service\CsrfService;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

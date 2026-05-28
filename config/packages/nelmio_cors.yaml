@@ -1,23 +1,20 @@
 nelmio_cors:
     defaults:
-        allow_credentials: true
         origin_regex: true
         allow_origin:
-            - 'https://ymeal-front.osc-fr1.scalingo.io'
-            - '^https://ymeal-back\.osc-fr1\.scalingo\.io$'
-            - '^http://localhost:8081$'
-            - '^http://127\.0\.0\.1:8081$'
-        allow_methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
+            - '^https://ymeal-front\.osc-fr1\.scalingo\.io$'
+            - '^http://localhost.*$'
         allow_headers: ['Content-Type', 'X-CSRF-TOKEN', 'Authorization', 'X-User-Id']
+        allow_methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
+        allow_credentials: true
         max_age: 3600
     paths:
         '^/':
             origin_regex: true
             allow_origin:
-                - 'https://ymeal-front.osc-fr1.scalingo.io'
-                - '^https://ymeal-back\.osc-fr1\.scalingo\.io$'
-                - '^http://localhost:8081$'
-                - '^http://127\.0\.0\.1:8081$'
+                - '^https://ymeal-front\.osc-fr1\.scalingo\.io$'
+                - '^http://localhost.*$'
             allow_headers: ['Content-Type', 'X-CSRF-TOKEN', 'Authorization', 'X-User-Id']
-            allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+            allow_methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
+            allow_credentials: true
             max_age: 3600

@@ -188,4 +188,48 @@ class RecipeService
             'fat_g'           => round($fat, 1),
         ];
     }
+
+    /**
+     *  Filtre les recettes selon la blacklist d'ingrédients et les régimes de l'utilisateur
+     *
+     * @param Recipe[] $recipes
+     * @return Recipe[]
+     */
+    public function filterRecipesForUser(array $recipes, User $user): array
+    {
+        $blacklistedIngredientIds = $user->getUserIngredientsBlacklist()
+            ->map(fn($ingredient) => $ingredient->getId())
+            ->toArray();
+
+        $userDietIds = $user->getDiets()
+            ->map(fn($diet) => $diet->getId())
+            ->toArray();
+
+        return array_values(array_filter($recipes, function (Recipe $recipe) use ($blacklistedIngredientIds, $userDietIds) {
+
+            // 1. Exclure les recettes contenant un ingrédient blacklisté
+            if (!empty($blacklistedIngredientIds)) {
+                foreach ($recipe->getRecipeIngredients() as $recipeIngredient) {
+                    $ingredientId = $recipeIngredient->getIngredient()?->getId();
+                    if ($ingredientId !== null && in_array($ingredientId, $blacklistedIngredientIds)) {
+                        return false;
+                    }
+                }
+            }
+
+            // 2. Filtrer par régime : compatibilité avec au moins un régime de l'utilisateur
+            // Les recettes sans régime associé sont toujours affichées (recettes génériques)
+            if (!empty($userDietIds)) {
+                $recipeDietIds = $recipe->getDietsHasRecipe()
+                    ->map(fn($diet) => $diet->getId())
+                    ->toArray();
+
+                if (!empty($recipeDietIds) && empty(array_intersect($userDietIds, $recipeDietIds))) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
+    }
 }

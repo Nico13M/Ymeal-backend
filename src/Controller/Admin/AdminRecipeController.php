@@ -62,10 +62,9 @@ class AdminRecipeController extends AbstractController
      * GET /admin/recipes
      * Liste toutes les recettes publiques
      */
-    #[Route('/index', name: 'index', methods: ['GET'])]
+   #[Route('/index', name: 'index', methods: ['GET'])]
     public function index(Request $request, RecipeRepository $recipeRepository): Response
     {
-        // Vérifier l'authentification
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
         }
@@ -74,8 +73,10 @@ class AdminRecipeController extends AbstractController
         if (!$user instanceof User) {
             return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
         }
+
         $recipes = $recipeRepository->findAll();
-        $data = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r, $user), $recipes);
+        $filtered = $this->recipeService->filterRecipesForUser($recipes, $user);
+        $data = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r, $user), $filtered);
 
         return $this->jsonWithUserId($data);
     }

@@ -3,7 +3,7 @@
 namespace App\Controller\Admin;
 
 use App\Entity\User;
-use App\Service\UserPreferencesService;
+use App\Service\UserPreferenceService;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -13,7 +13,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 class AdminUserPreferencesController extends AbstractController
 {
     public function __construct(
-        private UserPreferencesService $preferencesService,
+        private UserPreferenceService $preferencesService,
         private CsrfService $csrfService,
     ) {}
 

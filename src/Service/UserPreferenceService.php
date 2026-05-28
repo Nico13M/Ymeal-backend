@@ -11,7 +11,7 @@ use App\Entity\User;
 use App\Entity\UserPersonCount;
 use Doctrine\ORM\EntityManagerInterface;
 
-class UserPreferencesService
+class UserPreferenceService
 {
     public function __construct(
         private EntityManagerInterface $em,

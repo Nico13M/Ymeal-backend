@@ -13,17 +13,27 @@ class AdminUserPreferencesController extends AbstractController
 {
     public function __construct(
         private UserPreferencesService $preferencesService,
+        private CsrfService $csrfService,
     ) {}
 
     // ============= HELPER PRIVÉ =============
 
-    private function resolveUser(Request $request): User|Response
+     private function resolveUser(Request $request): User|Response
     {
+        if ($request->isMethod('POST')) {
+            $csrfToken = $request->headers->get('X-CSRF-TOKEN');
+            if (!$this->csrfService->isValid('api', $csrfToken)) {
+                return $this->json(['error' => 'Invalid CSRF token'], Response::HTTP_FORBIDDEN);
+            }
+        }
+
         if ($err = $this->userManager->ensureAuthenticated($request)) return $err;
+
         $user = $this->getUser();
         if (!$user instanceof User) {
             return $this->json(['error' => 'Non authentifié'], Response::HTTP_UNAUTHORIZED);
         }
+
         return $user;
     }
 

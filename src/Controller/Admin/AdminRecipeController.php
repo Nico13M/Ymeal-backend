@@ -74,13 +74,14 @@ class AdminRecipeController extends AbstractController
             return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $recipes = $recipeRepository->findAll();
+        $recipes  = $recipeRepository->findAll();
         $filtered = $this->recipeService->filterRecipesForUser($recipes, $user);
-        $data = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r, $user), $filtered);
+        $sorted   = $this->recipeService->sortRecipesByUserPersonCount($filtered, $user);
+        $data     = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r, $user), $sorted);
 
         return $this->jsonWithUserId($data);
     }
-
+    
     /**
      * GET /admin/recipes/search?difficulty=easy&dish_type=pasta
      * Recherche avancée avec filtres multiples

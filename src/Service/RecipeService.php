@@ -232,4 +232,28 @@ class RecipeService
             return true;
         }));
     }
+    /**
+ * Trie les recettes : en premier celles dont le nombre de portions
+ * correspond au nombre de personnes de l'utilisateur
+ *
+ * @param Recipe[] $recipes
+ * @return Recipe[]
+ */
+public function sortRecipesByUserPersonCount(array $recipes, User $user): array
+{
+    $userCount = $user->getPersonCount()?->getCount();
+
+    if ($userCount === null) {
+        return $recipes;
+    }
+
+    usort($recipes, function (Recipe $a, Recipe $b) use ($userCount) {
+        $aMatches = $a->getServings() === $userCount ? 0 : 1;
+        $bMatches = $b->getServings() === $userCount ? 0 : 1;
+
+        return $aMatches <=> $bMatches;
+    });
+
+    return $recipes;
+}
 }

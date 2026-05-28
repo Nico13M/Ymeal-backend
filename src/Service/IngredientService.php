@@ -27,7 +27,7 @@ class IngredientService
 
         $existing = $this->entityManager->getRepository(Ingredient::class)->findOneBy(['name' => $data['name']]);
         if ($existing) {
-            return new JsonResponse(['error' => 'Cet ingrédient existe déjà'], 409);
+          return $existing;
         }
 
         $ingredient = new Ingredient();

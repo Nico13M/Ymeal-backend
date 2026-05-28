@@ -23,14 +23,6 @@ class AdminReferenceController extends AbstractController
         $this->userManager = $userManager;
     }
 
-    private function jsonWithUserId($data): Response
-    {
-        $userId = $this->getUser()?->getId();
-        return $this->json([
-            'data' => $data,
-            'userId' => $userId,
-        ]);
-    }
     // ============= DIETS =============
 
     #[Route('/diets', name: 'diets', methods: ['GET'])]
@@ -40,7 +32,7 @@ class AdminReferenceController extends AbstractController
 
         $diets = $dietRepository->findBy([], ['name' => 'ASC']);
 
-        return $this->jsonWithUserId(array_map(fn($d) => [
+        return $this->json(array_map(fn($d) => [
             'id'   => $d->getId(),
             'name' => $d->getName(),
         ], $diets));
@@ -55,7 +47,7 @@ class AdminReferenceController extends AbstractController
 
         $allergies = $allergyRepository->findAll();
 
-        return $this->jsonWithUserId(array_map(fn($a) => [
+        return $this->json(array_map(fn($a) => [
             'id'   => $a->getId(),
             'name' => $a->getName(),
         ], $allergies));
@@ -70,7 +62,7 @@ class AdminReferenceController extends AbstractController
 
         $cuisines = $favoriteCuisineRepository->findAll();
 
-        return $this->jsonWithUserId(array_map(fn($c) => [
+        return $this->json(array_map(fn($c) => [
             'id'   => $c->getId(),
             'name' => $c->getName(),
         ], $cuisines));
@@ -86,12 +78,12 @@ class AdminReferenceController extends AbstractController
         $query = trim($request->query->get('q', ''));
 
         if (strlen($query) < 3) {
-            return $this->jsonWithUserId([]);
+            return $this->json([]);
         }
 
         $ingredients = $ingredientRepository->searchByName($query);
 
-        return $this->jsonWithUserId(array_map(fn($i) => [
+        return $this->json(array_map(fn($i) => [
             'id'   => $i->getId(),
             'name' => $i->getName(),
         ], $ingredients));

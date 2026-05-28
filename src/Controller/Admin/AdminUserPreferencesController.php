@@ -4,6 +4,7 @@ namespace App\Controller\Admin;
 
 use App\Entity\User;
 use App\Service\UserPreferenceService;
+use App\Service\UserManager;
 use Symfony\Component\HttpFoundation\Request;
 use App\Service\CsrfService;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,14 +14,16 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 #[Route('/admin/user/preferences', name: 'admin_user_preferences_')]
 class AdminUserPreferencesController extends AbstractController
 {
+    // ✅ ADD USERMANAGER INJECTION
     public function __construct(
         private UserPreferenceService $preferencesService,
         private CsrfService $csrfService,
+        private UserManager $userManager,  // ✅ ADD THIS
     ) {}
 
     // ============= HELPER PRIVÉ =============
 
-     private function resolveUser(Request $request): User|Response
+    private function resolveUser(Request $request): User|Response
     {
         if ($request->isMethod('POST')) {
             $csrfToken = $request->headers->get('X-CSRF-TOKEN');
@@ -29,6 +32,7 @@ class AdminUserPreferencesController extends AbstractController
             }
         }
 
+        // ✅ NOW THIS WORKS - userManager is injected
         if ($err = $this->userManager->ensureAuthenticated($request)) return $err;
 
         $user = $this->getUser();
@@ -39,6 +43,14 @@ class AdminUserPreferencesController extends AbstractController
         return $user;
     }
 
+    // ============= HELPER - RETURN JSON (no userId wrapper) =============
+    
+    private function jsonResponse($data): Response
+    {
+        // ✅ Return plain data, not wrapped
+        return $this->json($data);
+    }
+
     // ============= RÉGIMES =============
 
     #[Route('/diets', name: 'diets_get', methods: ['GET'])]
@@ -47,7 +59,7 @@ class AdminUserPreferencesController extends AbstractController
         $user = $this->resolveUser($request);
         if ($user instanceof Response) return $user;
 
-        return $this->jsonWithUserId($this->preferencesService->getDiets($user));
+        return $this->jsonResponse($this->preferencesService->getDiets($user));
     }
 
     #[Route('/diets', name: 'diets_set', methods: ['POST'])]
@@ -61,7 +73,7 @@ class AdminUserPreferencesController extends AbstractController
 
         $this->preferencesService->setDiets($user, $dietIds);
 
-        return $this->jsonWithUserId(['message' => 'Régimes mis à jour']);
+        return $this->jsonResponse(['message' => 'Régimes mis à jour']);
     }
 
     // ============= BUDGET =============
@@ -72,7 +84,7 @@ class AdminUserPreferencesController extends AbstractController
         $user = $this->resolveUser($request);
         if ($user instanceof Response) return $user;
 
-        return $this->jsonWithUserId($this->preferencesService->getBudget($user));
+        return $this->jsonResponse($this->preferencesService->getBudget($user));
     }
 
     #[Route('/budget', name: 'budget_set', methods: ['POST'])]
@@ -88,7 +100,7 @@ class AdminUserPreferencesController extends AbstractController
             return $this->json(['error' => 'Montant invalide'], Response::HTTP_BAD_REQUEST);
         }
 
-        return $this->jsonWithUserId($this->preferencesService->setBudget($user, (float) $amount));
+        return $this->jsonResponse($this->preferencesService->setBudget($user, (float) $amount));
     }
 
     // ============= NOMBRE DE PERSONNES =============
@@ -99,7 +111,7 @@ class AdminUserPreferencesController extends AbstractController
         $user = $this->resolveUser($request);
         if ($user instanceof Response) return $user;
 
-        return $this->jsonWithUserId($this->preferencesService->getPersonCount($user));
+        return $this->jsonResponse($this->preferencesService->getPersonCount($user));
     }
 
     #[Route('/person-count', name: 'person_count_set', methods: ['POST'])]
@@ -115,7 +127,7 @@ class AdminUserPreferencesController extends AbstractController
             return $this->json(['error' => 'Nombre de personnes invalide'], Response::HTTP_BAD_REQUEST);
         }
 
-        return $this->jsonWithUserId($this->preferencesService->setPersonCount($user, $count));
+        return $this->jsonResponse($this->preferencesService->setPersonCount($user, $count));
     }
 
     // ============= CUISINES FAVORITES =============
@@ -126,7 +138,7 @@ class AdminUserPreferencesController extends AbstractController
         $user = $this->resolveUser($request);
         if ($user instanceof Response) return $user;
 
-        return $this->jsonWithUserId($this->preferencesService->getFavoriteCuisines($user));
+        return $this->jsonResponse($this->preferencesService->getFavoriteCuisines($user));
     }
 
     #[Route('/favorite-cuisines', name: 'favorite_cuisines_set', methods: ['POST'])]
@@ -138,7 +150,7 @@ class AdminUserPreferencesController extends AbstractController
         $body = json_decode($request->getContent(), true);
         $this->preferencesService->setFavoriteCuisines($user, $body['cuisine_ids'] ?? []);
 
-        return $this->jsonWithUserId(['message' => 'Cuisines favorites mises à jour']);
+        return $this->jsonResponse(['message' => 'Cuisines favorites mises à jour']);
     }
 
     // ============= BLACKLIST =============
@@ -149,7 +161,7 @@ class AdminUserPreferencesController extends AbstractController
         $user = $this->resolveUser($request);
         if ($user instanceof Response) return $user;
 
-        return $this->jsonWithUserId($this->preferencesService->getBlacklist($user));
+        return $this->jsonResponse($this->preferencesService->getBlacklist($user));
     }
 
     #[Route('/blacklist', name: 'blacklist_set', methods: ['POST'])]
@@ -161,7 +173,7 @@ class AdminUserPreferencesController extends AbstractController
         $body = json_decode($request->getContent(), true);
         $this->preferencesService->setBlacklist($user, $body['ingredient_ids'] ?? []);
 
-        return $this->jsonWithUserId(['message' => 'Blacklist mise à jour']);
+        return $this->jsonResponse(['message' => 'Blacklist mise à jour']);
     }
 
     // ============= ALLERGIES =============
@@ -172,7 +184,7 @@ class AdminUserPreferencesController extends AbstractController
         $user = $this->resolveUser($request);
         if ($user instanceof Response) return $user;
 
-        return $this->jsonWithUserId($this->preferencesService->getAllergies($user));
+        return $this->jsonResponse($this->preferencesService->getAllergies($user));
     }
 
     #[Route('/allergies', name: 'allergies_set', methods: ['POST'])]
@@ -184,6 +196,6 @@ class AdminUserPreferencesController extends AbstractController
         $body = json_decode($request->getContent(), true);
         $this->preferencesService->setAllergies($user, $body['allergy_ids'] ?? []);
 
-        return $this->jsonWithUserId(['message' => 'Allergies mises à jour']);
+        return $this->jsonResponse(['message' => 'Allergies mises à jour']);
     }
 }

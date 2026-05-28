@@ -51,21 +51,35 @@ class UserPreferenceService
 
     public function getBudget(User $user): array
     {
-        $budget = $user->getMonthlyBudget();
-
-        return ['amount' => $budget ? (float) $budget->getAmount() : null];
+        $monthly = $user->getMonthlyBudget();
+        $budget = $monthly?->getBudget();
+        return [
+            'id'     => $budget?->getId(),
+            'key'    => $budget?->getKey(),
+            'label'  => $budget?->getLabel(),
+            'amount' => $budget ? (float) $budget->getAmount() : null,
+        ];
     }
 
-    public function setBudget(User $user, float $amount): array
+    // SET — reçoit un budget_id
+    public function setBudget(User $user, int $budgetId): array
     {
-        $budget = $user->getMonthlyBudget() ?? new MonthlyBudget();
-        $budget->setUser($user);
-        $budget->setAmount((string) $amount);
+        $budget = $this->em->getRepository(Budget::class)->find($budgetId);
+        if (!$budget) throw new \InvalidArgumentException('Budget introuvable');
 
-        $this->em->persist($budget);
+        $monthly = $user->getMonthlyBudget() ?? new MonthlyBudget();
+        $monthly->setUser($user);
+        $monthly->setBudget($budget);
+
+        $this->em->persist($monthly);
         $this->em->flush();
 
-        return ['amount' => (float) $budget->getAmount()];
+        return [
+            'id'     => $budget->getId(),
+            'key'    => $budget->getKey(),
+            'label'  => $budget->getLabel(),
+            'amount' => (float) $budget->getAmount(),
+        ];
     }
 
     // ============================================================

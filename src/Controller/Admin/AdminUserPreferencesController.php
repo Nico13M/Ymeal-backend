@@ -87,20 +87,24 @@ class AdminUserPreferencesController extends AbstractController
         return $this->jsonResponse($this->preferencesService->getBudget($user));
     }
 
-    #[Route('/budget', name: 'budget_set', methods: ['POST'])]
+   #[Route('/budget', name: 'budget_set', methods: ['POST'])]
     public function setBudget(Request $request): Response
     {
         $user = $this->resolveUser($request);
         if ($user instanceof Response) return $user;
 
         $body = json_decode($request->getContent(), true);
-        $amount = $body['amount'] ?? null;
+        $budgetId = $body['budget_id'] ?? null;
 
-        if ($amount === null || !is_numeric($amount) || $amount < 0) {
-            return $this->json(['error' => 'Montant invalide'], Response::HTTP_BAD_REQUEST);
+        if (!is_int($budgetId) || $budgetId < 1) {
+            return $this->json(['error' => 'budget_id invalide'], Response::HTTP_BAD_REQUEST);
         }
 
-        return $this->jsonResponse($this->preferencesService->setBudget($user, (float) $amount));
+        try {
+            return $this->jsonResponse($this->preferencesService->setBudget($user, $budgetId));
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
+        }
     }
 
     // ============= NOMBRE DE PERSONNES =============

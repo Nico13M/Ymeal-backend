@@ -88,4 +88,17 @@ class AdminReferenceController extends AbstractController
             'name' => $i->getName(),
         ], $ingredients));
     }
+    
+    #[Route('/budgets', name: 'budgets', methods: ['GET'])]
+    public function getBudgets(Request $request, BudgetRepository $budgetRepository): Response
+    {
+        if ($err = $this->userManager->ensureAuthenticated($request)) return $err;
+
+        return $this->json(array_map(fn($b) => [
+            'id'     => $b->getId(),
+            'key'    => $b->getKey(),
+            'label'  => $b->getLabel(),
+            'amount' => (float) $b->getAmount(),
+        ], $budgetRepository->findBy([], ['amount' => 'ASC'])));
+    }
 }

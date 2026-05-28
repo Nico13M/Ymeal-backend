@@ -3,6 +3,7 @@ nelmio_cors:
         allow_credentials: true
         origin_regex: true
         allow_origin:
+            - 'https://ymeal-front.osc-fr1.scalingo.io'
             - '^https://ymeal-back\.osc-fr1\.scalingo\.io$'
             - '^http://localhost:8081$'
             - '^http://127\.0\.0\.1:8081$'
@@ -13,6 +14,7 @@ nelmio_cors:
         '^/':
             origin_regex: true
             allow_origin:
+                - 'https://ymeal-front.osc-fr1.scalingo.io'
                 - '^https://ymeal-back\.osc-fr1\.scalingo\.io$'
                 - '^http://localhost:8081$'
                 - '^http://127\.0\.0\.1:8081$'

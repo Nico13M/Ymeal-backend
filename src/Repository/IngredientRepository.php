@@ -38,6 +38,17 @@ class IngredientRepository extends ServiceEntityRepository
             ->getArrayResult();
     }
 
+    public function searchByName(string $query, int $limit = 20): array
+    {
+        return $this->createQueryBuilder('i')
+            ->where('LOWER(i.name) LIKE LOWER(:query)')
+            ->setParameter('query', '%' . $query . '%')
+            ->orderBy('i.name', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
     //    /**
     //     * @return Ingredient[] Returns an array of Ingredient objects
     //     */

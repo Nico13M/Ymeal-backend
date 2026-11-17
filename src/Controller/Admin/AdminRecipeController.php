@@ -19,6 +19,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use App\Entity\User;
 use App\Service\IngredientMatcherService;
+use Psr\Log\LoggerInterface;
 
 #[Route('/admin/recipes', name: 'admin_recipe_')]
 class AdminRecipeController extends AbstractController
@@ -31,7 +32,33 @@ class AdminRecipeController extends AbstractController
         private RecipeSearchService $recipeSearchService,
         private EntityManagerInterface $em,
         private IngredientMatcherService $ingredientMatcher,
+        private LoggerInterface $logger,
     ) {}
+
+    /** Une recette est visible si elle est publique, ou si on en est l'auteur (ou admin). */
+    private function isVisible(Recipe $recipe): bool
+    {
+        return $recipe->isPublic() === true
+            || $this->userManager->canAccessUserId($recipe->getUser()?->getId());
+    }
+
+    private function notFound(): Response
+    {
+        return $this->json(['error' => 'Recette introuvable'], Response::HTTP_NOT_FOUND);
+    }
+
+    /** URL d'image acceptable : http(s) uniquement, taille de la colonne. Refuse javascript:, data:, etc. */
+    private function isValidImageUrl(mixed $url): bool
+    {
+        if ($url === '' || $url === null) {
+            return true;
+        }
+        if (!is_string($url) || strlen($url) > 255 || filter_var($url, FILTER_VALIDATE_URL) === false) {
+            return false;
+        }
+
+        return in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true);
+    }
 
     /**
      * Retourne une réponse JSON avec le header X-User-Id
@@ -74,7 +101,7 @@ class AdminRecipeController extends AbstractController
             return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $recipes  = $recipeRepository->findAll();
+        $recipes  = $recipeRepository->findVisibleTo($user);
         $filtered = $this->recipeService->filterRecipesForUser($recipes, $user);
         $sorted   = $this->recipeService->sortRecipesByUserPersonCount($filtered, $user);
         $data     = array_map(fn(Recipe $r) => $this->recipeService->serializeRecipe($r, $user), $sorted);
@@ -133,6 +160,16 @@ class AdminRecipeController extends AbstractController
             }
         }
 
+        if (!is_string($data['name']) || trim($data['name']) === '' || mb_strlen($data['name']) > 255) {
+            return $this->json(['success' => false, 'error' => "Le champ 'name' est invalide (255 caractères max)"], 400);
+        }
+        if (!is_string($data['description'])) {
+            return $this->json(['success' => false, 'error' => "Le champ 'description' est invalide"], 400);
+        }
+        if (isset($data['image']) && !$this->isValidImageUrl($data['image'])) {
+            return $this->json(['success' => false, 'error' => "Le champ 'image' doit être une URL http(s)"], 400);
+        }
+
         try {
             // Créer la recette
             $recipe = new Recipe();
@@ -143,8 +180,8 @@ class AdminRecipeController extends AbstractController
             $recipe->setUser($user);
 
             // Gedmo Sluggable et Timestampable ne se déclenchent pas sur Scalingo
-            $slug = !empty($data['slug']) ? $data['slug'] : $this->buildSlug($data['name']);
-            $recipe->setSlug($slug);
+            // Le slug est toujours généré côté serveur : un client ne peut pas imposer ni "squatter" un slug
+            $recipe->setSlug($this->buildSlug($data['name']));
             $recipe->setCreatedAt(new \DateTime());
             $recipe->setUpdatedAt(new \DateTime());
 
@@ -218,9 +255,10 @@ class AdminRecipeController extends AbstractController
             ], 201);
 
         } catch (\Exception $e) {
+            $this->logger->error('Création de recette impossible', ['exception' => $e]);
             return $this->json([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => 'Impossible de créer la recette'
             ], 500);
         }
     }
@@ -264,9 +302,10 @@ class AdminRecipeController extends AbstractController
             return $this->jsonWithUserId($result, 200);
 
         } catch (\Exception $e) {
+            $this->logger->error('Génération de recette IA impossible', ['exception' => $e]);
             return $this->json([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => 'Le générateur de recettes est indisponible'
             ], 502);
         }
     }
@@ -347,8 +386,7 @@ class AdminRecipeController extends AbstractController
         } else {
             return $this->json([
                 'error' => 'Erreur lors de l\'envoi des données',
-                'details' => $result['error'] ?? 'Erreur inconnue'
-            ], 500);
+            ], 502);
         }
     }
 
@@ -405,6 +443,10 @@ class AdminRecipeController extends AbstractController
             return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
         }
 
+        if (!$this->isVisible($recipe)) {
+            return $this->notFound();
+        }
+
         return $this->json($this->recipeService->serializeRecipe($recipe, $user), 200);
     }
 
@@ -426,7 +468,16 @@ class AdminRecipeController extends AbstractController
             return $this->json(['error' => 'Non autorisé'], 403);
         }
 
-        $data = json_decode($request->getContent(), true) ?? [];
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json(['error' => 'JSON invalide'], 400);
+        }
+        if (isset($data['image']) && !$this->isValidImageUrl($data['image'])) {
+            return $this->json(['error' => "Le champ 'image' doit être une URL http(s)"], 400);
+        }
+        if (isset($data['name']) && (!is_string($data['name']) || trim($data['name']) === '' || mb_strlen($data['name']) > 255)) {
+            return $this->json(['error' => "Le champ 'name' est invalide (255 caractères max)"], 400);
+        }
 
         // Mettre à jour les champs fournis
         if (isset($data['name'])) $recipe->setName($data['name']);
@@ -526,6 +577,10 @@ class AdminRecipeController extends AbstractController
             return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
         }
 
+        if (!$this->isVisible($recipe)) {
+            return $this->notFound();
+        }
+
         return $this->jsonWithUserId([
             'is_favorited' => $user->getUserRecipePreferences()->contains($recipe),
             'favorites_count' => $recipe->getUserRecipePreferences()->count()
@@ -546,6 +601,10 @@ class AdminRecipeController extends AbstractController
         $user = $this->getUser();
         if (!$user instanceof User) {
             return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$this->isVisible($recipe)) {
+            return $this->notFound();
         }
 
         // Vérifier que la recette n'est pas déjà en favoris
@@ -601,36 +660,36 @@ class AdminRecipeController extends AbstractController
             return $err;
         }
 
-        $criteria = [];
+        $user = $this->getUser();
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $filters = [];
 
         if ($request->query->has('is_public')) {
-            $criteria['isPublic'] = filter_var($request->query->get('is_public'), FILTER_VALIDATE_BOOLEAN);
+            $filters['is_public'] = filter_var($request->query->get('is_public'), FILTER_VALIDATE_BOOLEAN);
         }
 
         if ($request->query->has('difficulty')) {
-            $criteria['difficulty'] = $request->query->get('difficulty');
+            $filters['difficulty'] = $request->query->getString('difficulty');
         }
 
         if ($request->query->has('dish_type')) {
-            $criteria['dishType'] = $request->query->get('dish_type');
+            $filters['dishType'] = $request->query->getString('dish_type');
         }
 
         // Compter uniquement les recettes de l'utilisateur courant
         if ($request->query->getBoolean('mine')) {
-            $user = $this->getUser();
-            if (!$user instanceof User) {
-                return $this->json(['error' => 'Utilisateur non authentifié'], Response::HTTP_UNAUTHORIZED);
-            }
-            $criteria['user'] = $user;
+            $filters['mine'] = true;
         }
 
-        $count = empty($criteria)
-            ? count($recipeRepository->findAll())
-            : $recipeRepository->count($criteria);
+        // Ne compte que les recettes visibles : publiques + celles de l'utilisateur
+        $count = $recipeRepository->countVisibleTo($user, $filters);
 
         return $this->jsonWithUserId([
             'count' => $count,
-            'filters' => $criteria ? array_keys($criteria) : []
+            'filters' => array_keys($filters)
         ]);
     }
 }

@@ -1,0 +1,179 @@
+== Préparation ==
+  register alice -> 201 id=1 token=oui
+  register bob -> 201 id=2 token=oui
+  register root -> 201 id=3 token=oui
+  seed admin: ingredient=1 diet=1 sub=1
+  seed recettes: publique=1 privée=2
+
+== 1. Authentification ==
+  [OK]   anonyme -> 401
+  [OK]   X-User-Id seul n'authentifie plus -> 401
+  [OK]   jeton bidon -> 401
+  [OK]   jeton falsifié -> 401
+  [OK]   jeton valide -> 200
+  [OK]   HEAD anonyme -> 401 (pas de contournement)
+  [OK]   endpoint CSRF reste public
+  [OK]   page d'accueil sans chemin interne
+  [OK]   jeton expiré refusé par le service
+  [OK]   jeton frais accepté par le service
+  [OK]   secret trop court refusé
+
+== 2. Inscription / connexion ==
+  [OK]   mot de passe < 12 refusé
+  [OK]   e-mail invalide refusé
+  [OK]   doublon d'e-mail (casse différente) refusé
+  [OK]   échec de connexion identique (pas d'énumération)
+  [OK]   connexion OK (e-mail insensible à la casse) + jeton
+  [OK]   connexion : pas de hash de mot de passe dans la réponse
+
+== 3. Comptes utilisateurs (IDOR / rôles) ==
+  [OK]   liste des utilisateurs interdite à un simple user
+  [OK]   liste des utilisateurs autorisée à l'admin
+  [OK]   lire le compte d'un autre -> 403
+  [OK]   lire son propre compte -> 200
+  [OK]   modifier le compte d'un autre -> 403
+  [OK]   supprimer le compte d'un autre -> 403
+  [OK]   changer son mot de passe sans l'ancien -> refusé
+  [OK]   modifier son prénom -> 200
+  [OK]   prendre l'e-mail d'un autre -> refusé (unicité)
+  [OK]   nouveau mot de passe trop court -> refusé
+  [OK]   changer son mot de passe avec l'ancien -> 200
+  [OK]   ancien jeton révoqué après changement de mot de passe
+  [OK]   reconnexion avec le nouveau mot de passe
+
+== 4. Abonnements ==
+  [OK]   auto-attribution d'un abonnement -> 403
+  [OK]   liste de tous les abonnements -> 403
+  [OK]   l'admin peut attribuer un abonnement
+  [OK]   lire les abonnements d'un autre -> 403
+  [OK]   lire ses propres abonnements -> 200
+  [OK]   créer une offre -> 403
+  [OK]   modifier le prix d'une offre -> 403
+  [OK]   suppression d'abonnement (route réparée) -> 204
+
+== 5. Données de référence ==
+  [OK]   créer un ingrédient -> 403
+  [OK]   supprimer un ingrédient -> 403
+  [OK]   créer une unité -> 403
+  [OK]   créer un régime -> 403
+  [OK]   régimes d'un autre utilisateur -> 403
+  [OK]   imposer un régime à un autre -> 403
+  [OK]   lecture des ingrédients reste permise -> 200
+  [OK]   l'admin peut créer une unité
+
+== 6. Recettes ==
+  [OK]   ajouter un ingrédient à la recette d'un autre -> 403
+  [OK]   l'auteur peut ajouter un ingrédient (unité texte)
+  [OK]   retirer un ingrédient de la recette d'un autre -> 403
+  [OK]   recette privée d'un autre -> 404
+  [OK]   sa propre recette privée -> 200
+  [OK]   recette publique -> 200
+  [OK]   e-mail de l'auteur non exposé
+  [OK]   liste : pas de recette privée d'un autre
+  [OK]   compteur ne compte pas les privées d'autrui
+  [OK]   compteur de l'auteur inclut les siennes
+  [OK]   mettre en favori une recette privée d'autrui -> 404
+  [OK]   noter une recette privée d'autrui -> 404
+  [OK]   commentaire démesuré refusé
+  [OK]   noter une recette publique -> 201
+  [OK]   les notes n'exposent pas l'e-mail des auteurs
+  [OK]   modifier la recette d'un autre -> 403
+  [OK]   image avec schéma javascript: refusée
+  [OK]   slug imposé par le client ignoré
+
+== 7. Fuites d'information ==
+  [OK]   route /ratings/debug supprimée
+  [OK]   /admin/frigo/count fonctionne (bug corrigé)
+  [OK]   le frigo ignore X-User-Id (reste celui de bob)
+
+== 8. CORS ==
+  [OK]   origine localhost.evil.com refusée
+  [OK]   origine du front autorisée
+  [OK]   X-User-Id n'est plus un en-tête CORS autorisé
+
+== 9. Usages normaux (non-régression) ==
+  [OK]   GET /admin/reference/diets
+  [OK]   GET /admin/reference/allergies
+  [OK]   GET /admin/reference/favorite-cuisines
+  [OK]   GET /admin/reference/ingredients/search
+  [OK]   GET /admin/reference/budgets
+  [OK]   GET /admin/units/index
+  [OK]   GET /admin/diet/
+  [OK]   GET /admin/diet/{id}/show
+  [OK]   GET /admin/subscribe/
+  [OK]   GET /admin/subscribe/{id}/show
+  [OK]   GET /admin/ingredients/{id}
+  [OK]   POST préférences : régimes
+  [OK]   GET préférences : régimes
+  [OK]   POST préférences : allergies
+  [OK]   POST préférences : blacklist
+  [OK]   POST préférences : cuisines
+  [OK]   POST préférences : nombre de personnes
+  [OK]   GET préférences : nombre de personnes
+  [OK]   GET préférences : budget
+  [OK]   POST frigo : ajouter un ingrédient
+  [OK]   GET frigo : lister
+  [OK]   GET frigo : compter
+  [OK]   GET frigo : recherche d'ingrédient
+  [OK]   GET frigo : ingrédients
+  [OK]   DELETE frigo : retirer
+  [OK]   GET recettes : favoris (liste)
+  [OK]   POST favori sur une recette publique
+  [OK]   GET statut du favori
+  [OK]   DELETE favori
+  [OK]   GET recettes : recherche
+  [OK]   GET recettes : tendances
+  [OK]   GET recettes : blacklist
+  [OK]   GET ma note
+  [OK]   DELETE ma note
+  [OK]   PATCH sa propre recette
+  [OK]   DELETE sa propre recette privée
+  [OK]   admin : PATCH ingrédient
+  [OK]   admin : PATCH régime
+  [OK]   admin : associer un régime à un utilisateur
+  [OK]   admin : retirer ce régime
+  [OK]   admin : PUT unité
+  [OK]   admin : PATCH offre
+  [OK]   admin : attribuer un abonnement
+  [OK]   admin : PATCH abonnement
+  [OK]   admin : lire un abonnement par id
+  [OK]   admin : lire n'importe quel compte
+  [OK]   admin : modifier un compte sans current_password
+  [OK]   admin : DELETE ingrédient inutilisé
+  [OK]   recherche sans liste noire : la recette à 2 ingrédients est trouvée
+  [OK]   liste noire : la recette « Duo » (ingrédient interdit + un autre) est exclue
+  [OK]   DELETE son propre compte
+  [OK]   un compte supprimé ne peut plus utiliser son jeton
+
+== 10. Toutes les routes, contournements et entrées hostiles ==
+  81 routes trouvées
+  [OK]   toute route non publique répond 401 sans jeton (81 routes parcourues)
+  [OK]   aucune route ne répond 500 avec des entrées malformées
+  [OK]   aucune réponse ne divulgue de trace, de chemin ou de SQL
+  [OK]   variantes de chemin (casse, //, ../, encodage, point-virgule) : aucune ne contourne l'authentification
+  [OK]   surcharge de méthode ?_method=DELETE non acceptée
+  [OK]   le compte admin existe toujours après ces tentatives
+  [OK]   « bearer » en minuscules accepté
+  [OK]   Authorization refusé : jeton suivi de texte
+  [OK]   Authorization refusé : schéma Basic
+  [OK]   Authorization refusé : jeton vide
+  [OK]   Authorization refusé : partie en trop
+  [OK]   Authorization refusé : signature vide
+  [OK]   Authorization refusé : payload vide
+  [OK]   Authorization refusé : jeton sans schéma
+  [OK]   payload remplacé (uid admin) avec l'ancienne signature -> refusé
+  [OK]   inscription avec champs en trop (#0) : pas de rôle admin
+  [OK]   inscription avec champs en trop (#1) : pas de rôle admin
+  [OK]   inscription avec champs en trop (#2) : pas de rôle admin
+  [OK]   édition de son compte avec roles/password_hash/id : ignorés
+  [OK]   alice n'est toujours pas admin
+  [OK]   injections SQL dans les paramètres : pas d'erreur 500, aucune ligne en trop
+  [OK]   la table user existe toujours après les tentatives de DROP
+  [OK]   écriture sans en-tête CSRF -> 403
+  [OK]   écriture avec jeton CSRF bidon -> 403
+  [OK]   donnée mal typée (tableau à la place d'un texte) -> 400 JSON
+  [OK]   supprimer un ingrédient encore utilisé -> 409 JSON (et pas 500)
+  [OK]   la réponse 409 ne contient aucun détail SQL
+  [OK]   aucune des 1847 réponses ne contient de hash de mot de passe ni de secret
+
+== Résultat : 150 OK, 0 échec(s) ==

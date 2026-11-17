@@ -1,20 +1,22 @@
 nelmio_cors:
     defaults:
         origin_regex: true
+        # Seule l'origine du front de production est autorisée (regex ancrée aux deux bouts).
         allow_origin:
             - '^https://frontmeal\.osc-fr1\.scalingo\.io$'
-            - '^http://localhost.*$'
-        allow_headers: ['Content-Type', 'X-CSRF-TOKEN', 'Authorization', 'X-User-Id']
+        # X-User-Id n'est plus accepté : l'identité vient uniquement du jeton signé (Authorization: Bearer)
+        allow_headers: ['Content-Type', 'X-CSRF-TOKEN', 'Authorization']
         allow_methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
         allow_credentials: true
         max_age: 3600
     paths:
-        '^/':
-            origin_regex: true
+        '^/': ~
+
+# Le front local n'est autorisé qu'en développement, avec un port optionnel et sans suffixe de domaine
+# (l'ancien '^http://localhost.*$' acceptait http://localhost.evil.com).
+when@dev:
+    nelmio_cors:
+        defaults:
             allow_origin:
                 - '^https://frontmeal\.osc-fr1\.scalingo\.io$'
-                - '^http://localhost.*$'
-            allow_headers: ['Content-Type', 'X-CSRF-TOKEN', 'Authorization', 'X-User-Id']
-            allow_methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
-            allow_credentials: true
-            max_age: 3600
+                - '^http://(localhost|127\.0\.0\.1)(:[0-9]+)?$'

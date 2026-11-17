@@ -14,8 +14,7 @@ class AppController extends AbstractController
     ): JsonResponse
     {
         return $this->json([
-            'message' => 'Welcome to your new controller!',
-            'path' => 'src/Controller/AppController.php',
+            'message' => 'Ymeal API',
         ]);
     }
 }

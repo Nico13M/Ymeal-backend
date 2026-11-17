@@ -9,6 +9,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use App\Service\DietManager;
 use App\Service\CsrfService;
+use App\Service\UserManager;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,6 +21,7 @@ class AdminDietController extends AbstractController
         private DietManager $dietManager,
         private EntityManagerInterface $entityManager,
         private CsrfService $csrfService,
+        private UserManager $userManager,
     ) {
     }
 
@@ -44,6 +46,11 @@ class AdminDietController extends AbstractController
     #[Route('/user/{userId}/diets', name: 'user_diets', methods: ['GET'])]
     public function getUserDiets(int $userId): JsonResponse
     {
+        // Les régimes alimentaires sont des données de santé : propriétaire ou admin uniquement
+        if (!$this->userManager->canAccessUserId($userId)) {
+            return $this->userManager->forbidden();
+        }
+
         $user = $this->entityManager->getRepository(User::class)->find($userId);
 
         if (!$user) {
@@ -118,7 +125,7 @@ class AdminDietController extends AbstractController
         } catch (\Exception $e) {
             return $this->json([
                 'success' => false,
-                'error' => 'Error creating diet: ' . $e->getMessage(),
+                'error' => 'Error creating diet',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -162,7 +169,7 @@ class AdminDietController extends AbstractController
         } catch (\Exception $e) {
             return $this->json([
                 'success' => false,
-                'error' => 'Error updating diet: ' . $e->getMessage(),
+                'error' => 'Error updating diet',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -201,7 +208,7 @@ class AdminDietController extends AbstractController
         } catch (\Exception $e) {
             return $this->json([
                 'success' => false,
-                'error' => 'Error deleting diet: ' . $e->getMessage(),
+                'error' => 'Error deleting diet',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -249,7 +256,7 @@ class AdminDietController extends AbstractController
         } catch (\Exception $e) {
             return $this->json([
                 'success' => false,
-                'error' => 'Error assigning diet to user: ' . $e->getMessage(),
+                'error' => 'Error assigning diet to user',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -297,7 +304,7 @@ class AdminDietController extends AbstractController
         } catch (\Exception $e) {
             return $this->json([
                 'success' => false,
-                'error' => 'Error removing diet from user: ' . $e->getMessage(),
+                'error' => 'Error removing diet from user',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

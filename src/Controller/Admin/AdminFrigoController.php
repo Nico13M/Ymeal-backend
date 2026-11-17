@@ -5,6 +5,7 @@ use App\Entity\Frigo;
 use App\Entity\FrigoIngredient;
 use App\Entity\Ingredient;
 use App\Entity\User;
+use App\Repository\FrigoIngredientRepository;
 use App\Repository\IngredientRepository;
 use App\Repository\UnitsRepository;
 use App\Repository\UserRepository;
@@ -25,15 +26,10 @@ class AdminFrigoController extends AbstractController
 
     private function resolveUser(Request $request, UserRepository $userRepository): ?User
     {
+        // Seul l'utilisateur authentifié par jeton signé compte : on ne se fie à aucun en-tête fourni par le client
         $user = $this->getUser();
-        if ($user instanceof User) {
-            return $user;
-        }
-        $userId = $request->headers->get('X-User-Id');
-        if ($userId && is_numeric($userId)) {
-            return $userRepository->find((int) $userId);
-        }
-        return null;
+
+        return $user instanceof User ? $user : null;
     }
 
     private function getOrCreateFrigo(User $user, EntityManagerInterface $em): Frigo
@@ -197,14 +193,16 @@ class AdminFrigoController extends AbstractController
     }
 
      #[Route('/count', name: 'count', methods: ['GET'])]
-    public function count(Request $request): Response
+    public function count(Request $request, FrigoIngredientRepository $frigoIngredientRepository): Response
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
         }
- 
+
         $user = $this->getUser();
-        assert($user instanceof User);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Utilisateur non authentifié'], 401);
+        }
  
         $frigo = $user->getFrigo();
  
@@ -216,7 +214,7 @@ class AdminFrigoController extends AbstractController
             ]);
         }
  
-        $count = $this->frigoIngredientRepository->countByFrigo($frigo->getId());
+        $count = $frigoIngredientRepository->countByFrigo($frigo->getId());
  
         return $this->json([
             'count'     => $count,

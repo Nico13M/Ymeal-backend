@@ -58,7 +58,7 @@ class DataService
                 return [
                     'success' => false,
                     'status_code' => $statusCode,
-                    'error' => $responseData
+                    'error' => 'External service error'
                 ];
             }
 
@@ -70,7 +70,7 @@ class DataService
 
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => 'External service unavailable'
             ];
         }
     }
@@ -80,7 +80,13 @@ class DataService
      */
     private function getApiToken(): string
     {
-        return $_ENV['EXTERNAL_API_TOKEN'] ?? 'default-token';
+        $token = $_ENV['EXTERNAL_API_TOKEN'] ?? getenv('EXTERNAL_API_TOKEN');
+        if (!is_string($token) || $token === '') {
+            // Pas de jeton par défaut : on refuse d'envoyer des données personnelles sans authentification valide
+            throw new \RuntimeException('EXTERNAL_API_TOKEN is not configured');
+        }
+
+        return $token;
     }
 
     /**
@@ -137,7 +143,7 @@ class DataService
                 return [
                     'success' => false,
                     'status_code' => $statusCode,
-                    'error' => $responseData
+                    'error' => 'External service error'
                 ];
             }
 
@@ -149,7 +155,7 @@ class DataService
 
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => 'External service unavailable'
             ];
         }
     }

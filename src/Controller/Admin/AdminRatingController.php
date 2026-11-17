@@ -44,7 +44,8 @@ class AdminRatingController extends AbstractController
     {
         $recipe = $this->em->getRepository(Recipe::class)->find($recipeId);
 
-        if (!$recipe) {
+        // Une recette privée n'est visible (et notable) que par son auteur ou un admin
+        if (!$recipe || ($recipe->isPublic() !== true && !$this->userManager->canAccessUserId($recipe->getUser()?->getId()))) {
             return $this->jsonWithUserId(['error' => 'Recette introuvable'], 404);
         }
 
@@ -64,7 +65,8 @@ class AdminRatingController extends AbstractController
             'updated_at' => $rating->getUpdatedAt()->format(\DateTimeInterface::ATOM),
             'user'       => [
                 'id'   => $rating->getUser()->getId(),
-                'name' => $rating->getUser()->getUserIdentifier(),
+                // Pseudo public : ne jamais exposer l'e-mail (identifiant de connexion) aux autres utilisateurs
+                'name' => $rating->getUser()->getPseudo(),
             ],
         ];
 
@@ -143,22 +145,23 @@ class AdminRatingController extends AbstractController
             $data = json_decode($content, true);
 
             if (!is_array($data)) {
-                return $this->jsonWithUserId([
-                    'error' => 'JSON invalide',
-                    'received' => $content,
-                    'decoded_type' => gettype($data),
-                ], 400);
+                return $this->jsonWithUserId(['error' => 'JSON invalide'], 400);
             }
         }
 
         // Validation
         if (!array_key_exists('rating', $data)) {
-            return $this->jsonWithUserId(['error' => "Le champ 'rating' est obligatoire", 'received_data' => $data], 400);
+            return $this->jsonWithUserId(['error' => "Le champ 'rating' est obligatoire"], 400);
         }
 
         $value = (int) $data['rating'];
         if ($value < 1 || $value > 5) {
             return $this->jsonWithUserId(['error' => 'La note doit être comprise entre 1 et 5'], 400);
+        }
+
+        $comment = $data['comment'] ?? null;
+        if ($comment !== null && (!is_string($comment) || mb_strlen($comment) > 2000)) {
+            return $this->jsonWithUserId(['error' => 'Le commentaire doit être un texte de 2000 caractères maximum'], 400);
         }
 
         // Upsert : mise à jour si déjà existant, création sinon
@@ -172,7 +175,7 @@ class AdminRatingController extends AbstractController
         }
 
         $rating->setRating($value);
-        $rating->setComment($data['comment'] ?? null);
+        $rating->setComment($comment);
 
         if ($isNew) {
             $this->em->persist($rating);
@@ -251,18 +254,4 @@ class AdminRatingController extends AbstractController
         return $this->jsonWithUserId(['rating' => $this->serialize($rating)]);
     }
 
-    /**
-     * POST /admin/ratings/debug
-     * Debug pour voir ce qui est reçu
-     */
-    #[Route('/debug', name: 'debug', methods: ['POST'])]
-    public function debug(Request $request): Response
-    {
-        return $this->json([
-            'content_type' => $request->headers->get('Content-Type'),
-            'content' => $request->getContent(),
-            'toArray_result' => $request->toArray(),
-            'json_decode_result' => json_decode($request->getContent(), true),
-        ], 200);
-    }
     }

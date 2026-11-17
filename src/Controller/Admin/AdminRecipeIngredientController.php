@@ -37,6 +37,9 @@ class AdminRecipeIngredientController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json(['error' => 'Invalid JSON'], 400);
+        }
 
         // 1. Validation des champs obligatoires
         if (empty($data['recipe_id']) || empty($data['ingredient_id']) || empty($data['quantity'])) {
@@ -50,12 +53,19 @@ class AdminRecipeIngredientController extends AbstractController
         if (!$recipe) return $this->json(['error' => 'Recette introuvable'], 404);
         if (!$ingredient) return $this->json(['error' => 'Ingrédient introuvable'], 404);
 
+        // Seul l'auteur de la recette (ou un admin) peut la modifier
+        if (!$this->userManager->canAccessUserId($recipe->getUser()?->getId())) {
+            return $this->userManager->forbidden();
+        }
+
         // 3. Création de la liaison (Le Pivot)
         $link = new RecipeIngredient();
         $link->setRecipe($recipe);
         $link->setIngredient($ingredient);
         $link->setQuantity((int)$data['quantity']); // Force en entier
-        $link->setUnit($data['unit'] ?? null); // Unité optionnelle (ex: 'g', 'ml', 'pincée')
+        // Unité optionnelle en texte libre (ex: 'g', 'ml', 'pincée'), limitée à la taille de la colonne
+        $unitLabel = isset($data['unit']) && is_string($data['unit']) ? mb_substr(trim($data['unit']), 0, 50) : null;
+        $link->setUnitLabel($unitLabel ?: null);
 
         $em->persist($link);
         $em->flush();
@@ -66,7 +76,7 @@ class AdminRecipeIngredientController extends AbstractController
             'recipe' => $recipe->getName(),
             'ingredient' => $ingredient->getName(),
             'quantity' => $link->getQuantity(),
-            'unit' => $link->getUnit()
+            'unit' => $link->getUnitLabel()
         ], 201);
     }
 
@@ -84,6 +94,11 @@ class AdminRecipeIngredientController extends AbstractController
         $csrfToken = $request->headers->get('X-CSRF-TOKEN');
         if (!$csrfService->isValid('api', $csrfToken)) {
             return $this->json(['error' => 'Invalid CSRF token'], Response::HTTP_FORBIDDEN);
+        }
+
+        // Seul l'auteur de la recette (ou un admin) peut retirer un ingrédient
+        if (!$this->userManager->canAccessUserId($recipeIngredient->getRecipe()?->getUser()?->getId())) {
+            return $this->userManager->forbidden();
         }
 
         $em->remove($recipeIngredient);

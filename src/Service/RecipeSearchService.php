@@ -32,15 +32,16 @@ class RecipeSearchService
         $qb = $this->recipeRepository->createQueryBuilder('r');
 
         if ($dietIds) {
-            $qb->leftJoin('r.dietsHasRecipe', 'd')
+            $qb->leftJoin('r.diets_has_recipe', 'd')
                ->andWhere('d.id IN (:dietIds)')
                ->setParameter('dietIds', $dietIds);
         }
 
         if ($blacklistIds) {
-            $qb->leftJoin('r.recipeIngredients', 'ri')
-               ->leftJoin('ri.ingredient', 'i')
-               ->andWhere('i.id NOT IN (:blacklistIds)')
+            // NOT EXISTS : une recette est exclue dès qu'UN de ses ingrédients est interdit.
+            // (Un simple "i.id NOT IN" sur une jointure ne retire que des lignes et laisse passer
+            // les recettes qui contiennent aussi d'autres ingrédients.)
+            $qb->andWhere('NOT EXISTS (SELECT ri_bl.id FROM App\Entity\RecipeIngredient ri_bl WHERE ri_bl.recipe = r AND IDENTITY(ri_bl.ingredient) IN (:blacklistIds))')
                ->setParameter('blacklistIds', $blacklistIds);
         }
 

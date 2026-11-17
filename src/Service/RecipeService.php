@@ -51,7 +51,6 @@ class RecipeService
             'author' => $recipe->getUser() ? [
                 'id' => $recipe->getUser()->getId(),
                 'name' => $recipe->getUser()->getFirstname() . ' ' . $recipe->getUser()->getLastname(),
-                'email' => $recipe->getUser()->getEmail(),
             ] : null,
 
             // ============= CONTENU NUTRITIONNEL =============

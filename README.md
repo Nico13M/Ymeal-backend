@@ -135,3 +135,11 @@ Résultats et historique : [tests/security/RESULTATS.md](tests/security/RESULTAT
 ```bash
 composer audit    # doit afficher « No security vulnerability advisories found »
 ```
+
+# Documentation du projet
+
+- [COMMANDES.md](COMMANDES.md) : toutes les commandes (installation, lancement, base de données, tests, déploiement, dépannage).
+- [SECURITY_AUDIT.md](SECURITY_AUDIT.md) : audit de sécurité, corrections faites et reste à faire.
+- [FRONT_CHANGES.md](FRONT_CHANGES.md) : ce que les corrections de sécurité changent pour le front.
+- [docs/openapi.yaml](docs/openapi.yaml) et [docs/swagger.html](docs/swagger.html) : documentation de l'API (Swagger).
+- [tests/security/RESULTATS.md](tests/security/RESULTATS.md) : résultats détaillés des tests de sécurité (banc interne, Postman, test d'intrusion).

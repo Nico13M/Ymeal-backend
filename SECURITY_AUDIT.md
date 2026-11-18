@@ -1,11 +1,23 @@
 # Audit de sécurité : suivi des corrections
 
-Branche : `Fix/securite` — audit du 2026-11-17, corrections appliquées dans la foulée, état mis à jour le 2026-11-18.
+Branche : `Fix/securite` — audit du 2026-11-17, corrections appliquées dans la foulée, état mis à jour le 2026-11-18 (test d'intrusion et correction du contournement par double slash).
 **Rien n'est commité ni poussé** : les changements sont dans le répertoire de travail.
 
 ## 0. État au 2026-11-18
 
-**Code : terminé.** Plus aucune correction de code n'est prévue à ce stade. Le banc de test passe à 150 sur 150 (aussi en configuration de production), `composer audit` ne signale rien. Les points qui restent sont des actions d'infrastructure (base de production, variables d'environnement, front) et des améliorations optionnelles.
+**Code : failles critiques et force brute corrigées.** Le banc de test passe à 160 sur 160 (aussi en configuration de production), `composer audit` ne signale rien. Il reste à traiter, côté code, des constats de gravité moyenne ou basse du test d'intrusion (plafonds de taille, en-têtes de sécurité), puis des actions d'infrastructure (base de production, variables d'environnement dont `TRUSTED_PROXIES`, front).
+
+### Test d'intrusion du 2026-11-18 (local, base jetable)
+
+Un test d'intrusion actif (`php tests/security/pentest.php`) et la collection Postman (`tests/security/postman/`, 143 vérifications) ont été passés sur une instance locale en configuration de production.
+
+- **Faille critique trouvée et corrigée : contournement du contrôle d'accès par double slash.** `GET /admin/user-subscribe//` (ou `///`, `/%2f`) renvoyait à un utilisateur normal la liste complète des abonnements de tous les comptes, parce que la règle `^/admin/user-subscribe/?$` de `security.yaml` ne couvrait pas ces variantes. Correction : règle `^/admin/user-subscribe/*$` et contrôle `isAdmin()` dans `AdminUserSubscribeController::index` (défense en profondeur). Vérifié : plus aucun contournement par chemin, banc de test toujours à 150 sur 150.
+- **Résistent au test** : jetons falsifiés (`alg: none`, signature supprimée, charge utile modifiée, expiration repoussée), énumération d'identifiants (IDOR), escalade de rôle par champs en trop, environ 200 injections (SQL, modèles, traversée de chemin), fichiers sensibles non servis, CORS, concurrence à l'inscription, ancien jeton refusé après changement de mot de passe ou suppression du compte.
+- **Constats restants (non corrigés)** :
+  - ~~Haute : aucune limitation des tentatives de connexion~~ **Corrigé le 2026-11-18** : `symfony/rate-limiter`, voir « Limitation des tentatives » ci-dessous.
+  - Moyenne : aucun plafond de taille sur les recettes (description de 2 Mo et 20 000 étapes acceptées). La limitation des inscriptions est corrigée (10 par heure et par IP).
+  - Basse : aucun en-tête de sécurité HTTP ; `X-Powered-By: PHP/x.y.z` visible (`expose_php=Off` en production).
+  - À savoir : le jeton CSRF est lié à une session (cookie `PHPSESSID`) ; les URL d'image internes (`http://169.254.169.254/...`) sont stockées sans être téléchargées par le back, donc le front et le service Python ne doivent jamais les récupérer côté serveur ; bcrypt ne lit que les 72 premiers octets d'un mot de passe.
 
 Dernières décisions et changements (2026-11-18) :
 - **Base de développement** : l'ancienne base Aiven n'existe plus (le nom d'hôte n'est plus résolu par le DNS). `DATABASE_URL` de `.env.local` pointe désormais vers une base **SQLite locale** `var/data_dev.db`, créée avec `php bin/console doctrine:schema:create` (23 tables, ignorée par Git). Elle est vide et **sans suivi de migrations** : ne pas y lancer `doctrine:migrations:migrate`, les migrations sont écrites pour PostgreSQL. Limite : la reconnaissance automatique des ingrédients dans un texte de recette IA utilise `similarity()` de PostgreSQL et ne marche pas sous SQLite.
@@ -21,9 +33,32 @@ Dernières décisions et changements (2026-11-18) :
 | Avant la mise en ligne | Créer une base PostgreSQL hébergée, mettre son URL dans `DATABASE_URL` de la plateforme, lancer `doctrine:migrations:migrate` (sauvegarde avant), puis `app:user:promote` | Vous (je peux le faire avec l'URL dans `.env.local`) |
 | Avant la mise en ligne | Production : nouvel `APP_SECRET`, `APP_ENV=prod`, `APP_DEBUG=0`, `EXTERNAL_API_TOKEN`, `PYTHON_API_URL`, `register_argc_argv=Off` | Vous |
 | Avant la mise en ligne | Vérifier sur PostgreSQL et avec le front réel : migration, `schema:validate`, IA, export, parcours navigateur et CORS (liste détaillée en section 1) | Vous / équipe |
-| Avant la mise en ligne | Adapter le front : `Authorization: Bearer <token>` à la place de `X-User-Id`, gérer le 401, mot de passe de 12 caractères, `current_password` | Équipe front |
-| Optionnel | `git rm --cached .env .env.dev` (et `.DS_Store`) | Vous |
+| Avant la mise en ligne | Adapter le front : `Authorization: Bearer <token>` à la place de `X-User-Id`, gérer le 401, mot de passe de 12 caractères, `current_password` | Équipe front ; liste détaillée dans [FRONT_CHANGES.md](FRONT_CHANGES.md) (cookies, CSRF, 429, `Retry-After`) | Équipe front |
+| Avant la mise en ligne | **Définir `TRUSTED_PROXIES`** sur la plateforme (sinon la limitation par IP voit l'IP du routeur et vise tous les clients ensemble), ajouter les en-têtes de sécurité, `expose_php=Off` | Vous / moi |
+| Optionnel | `git rm --cached .env .env.dev` (`.DS_Store` n'est plus suivi et `.gitignore` est complété) | Vous |
 | Plus tard | Limitation des tentatives de connexion, suppression d'un compte avec recettes, consentement avant l'export RGPD, liste blanche vers le service Python, validations sur les autres entités, tests PHPUnit, test d'intrusion sur un environnement de test | À planifier |
+
+### Test total du 2026-11-18 (avant commit)
+
+Contrôles statiques : `php -l` sur tous les fichiers PHP modifiés, `lint:container`, `lint:yaml config`, `composer validate`, `composer audit` : tous OK. Banc interne : **160 sur 160** en environnement de test et en production. Collection Postman : 142 sur 143 (seul écart : version de PHP exposée). Test d'intrusion sur serveur réel en production : **140 réussites, 10 écarts, aucun critique ni haut** (en-têtes de sécurité, version de PHP, plafonds de taille des recettes, et `TRACK`/`FOO` qui viennent du serveur `php -S`). Détail dans [tests/security/RESULTATS.md](tests/security/RESULTATS.md). Changements attendus côté front : [FRONT_CHANGES.md](FRONT_CHANGES.md).
+
+### Limitation des tentatives (2026-11-18)
+
+Ajout de `symfony/rate-limiter` (seule dépendance ajoutée ; `composer audit` : aucun avis). Configuration dans `config/packages/framework.yaml`, appliquée dans `AdminAuthController` :
+
+| Limiteur | Clé | Limite | Effet |
+|---|---|---|---|
+| `login_account` | IP + e-mail | 5 tentatives / 15 min (fenêtre glissante) | 429 ; remis à zéro après une connexion réussie. Le bon mot de passe est aussi refusé pendant le blocage. |
+| `login_ip` | IP | 30 tentatives / 15 min | 429 (anti-pulvérisation d'un mot de passe sur beaucoup de comptes) |
+| `register_ip` | IP | 10 inscriptions / heure | 429 |
+
+La réponse est `429 {"error":"Too many attempts, try again later"}` avec l'en-tête `Retry-After` (secondes). En environnement `test`, les limiteurs sont désactivés (`no_limit`). Le banc de test (`harness`) leur donne une IP différente à chaque appel et les vérifie dans la section 10.7c.
+
+Points d'attention :
+- **`TRUSTED_PROXIES`** : derrière Scalingo, l'IP du client n'est lue dans `X-Forwarded-For` que si cette variable d'environnement est définie (par exemple `REMOTE_ADDR`, ou la liste des IP du routeur). Sans elle, tous les clients partagent l'IP du routeur : 10 inscriptions par heure pour toute la plateforme, et 30 connexions échouées par 15 minutes pour tout le monde. **À définir avant la mise en ligne.**
+- Le compteur est stocké dans le cache de l'application (fichiers). Avec plusieurs conteneurs, chacun a son propre compteur : la limite effective est multipliée par leur nombre. Pour un compteur commun, configurer un cache partagé (Redis, ou la base) pour le pool `cache.rate_limiter`.
+- Un attaquant peut bloquer la connexion d'une victime depuis sa propre IP uniquement (la clé contient l'IP) : le compte n'est pas verrouillé globalement.
+- Pour vider les compteurs en développement : `php bin/console cache:pool:clear cache.rate_limiter`.
 
 ## 1. Reste à faire (par priorité)
 
@@ -60,11 +95,13 @@ Dernières décisions et changements (2026-11-18) :
 
 ### Plus tard
 
-- [ ] Limitation des tentatives de connexion (`login_throttling` ne s'applique pas à l'authentificateur personnalisé : prévoir `symfony/rate-limiter` sur `/admin/auth/login`).
+- [x] ~~Limitation des tentatives de connexion~~ : faite le 2026-11-18 (`symfony/rate-limiter`, voir la section « Limitation des tentatives »). Reste à envisager : stockage partagé si plusieurs instances (voir plus bas).
 - [ ] Supprimer proprement un compte qui a des recettes (aujourd'hui la clé étrangère fait échouer la suppression, ce qui bloque le droit à l'effacement RGPD).
 - [ ] Consentement explicite avant l'export `POST /admin/recipes/user/data/send`.
 - [ ] Filtrer les champs transmis au service Python dans `/admin/recipes/generate` (liste blanche).
-- [ ] Contraintes de validation (`Assert\*`) sur les autres entités (longueurs des champs).
+- [ ] Contraintes de validation (`Assert\*`) sur les autres entités (longueurs des champs) et plafonds de taille sur les recettes (description, nombre d'étapes, nombre d'ingrédients).
+- [ ] En-têtes de sécurité HTTP (`X-Content-Type-Options: nosniff`, `X-Frame-Options`, `Strict-Transport-Security`, `Content-Security-Policy`, `Referrer-Policy`), au niveau de la plateforme ou d'un écouteur Symfony.
+- [x] Limitation des inscriptions en rafale : faite (10 par heure et par IP).
 - [ ] Révocation de jeton hors changement de mot de passe (liste de jetons révoqués), si nécessaire.
 - [ ] Retirer le CSRF une fois le front passé aux jetons Bearer (il n'apporte plus rien avec ce mode d'authentification), ou le lier à la session.
 - [ ] Brancher le banc de test (`php tests/security/harness.php`) dans une intégration continue, et éventuellement le convertir en tests PHPUnit.
@@ -134,7 +171,14 @@ Deux défauts **déjà présents avant l'audit** ont été trouvés par ces test
 ### Configuration et fuites
 | Fichier | Changement |
 |---|---|
-| `config/packages/nelmio_cors.yaml` | Regex ancrée, `localhost` seulement en dev, `X-User-Id` retiré. |
+| `.gitignore` (2026-11-18) | Ajout de `.DS_Store`, `*.db`, `*.sqlite*`, `*.bak` et des fichiers temporaires des tests d'intrusion ; `.DS_Store` retiré du suivi Git. |
+| `FRONT_CHANGES.md`, `COMMANDES.md`, `docs/` (2026-11-18) | Documentation : changements attendus côté front, commandes du projet, spécification OpenAPI (Swagger). |
+| `config/packages/framework.yaml` (2026-11-18) | `rate_limiter` (`login_account`, `login_ip`, `register_ip`), `trusted_proxies` via `TRUSTED_PROXIES`. |
+| `AdminAuthController` (2026-11-18) | Limitation des tentatives de connexion et d'inscription (429 + `Retry-After`). |
+| `composer.json` / `composer.lock` (2026-11-18) | Ajout de `symfony/rate-limiter` 7.4. |
+| `config/packages/security.yaml` (2026-11-18) | Règle `^/admin/user-subscribe/*$` à la place de `/?$` : corrige le contournement par double slash. |
+| `AdminUserSubscribeController` (2026-11-18) | `index()` vérifie `isAdmin()` (défense en profondeur). |
+| `config/packages/nelmio_cors.yaml` | Regex ancrée, `localhost` seulement en dev, `X-User-Id` retiré. `Retry-After` exposé aux navigateurs (`expose_headers`) pour les réponses 429. |
 | `.env`, `.env.dev` | Mot de passe et `APP_SECRET` retirés du contenu (toujours suivis par Git, voir « Reste à faire »). |
 | `DataService`, `AiRecipeService`, `AdminAiRecipeController`, `AppController` | Pas de jeton par défaut, messages d'erreur génériques, chemin interne retiré de l'accueil. |
 | `src/Form/UserEditType.php` | Longueur maximale alignée sur la colonne (45). |
@@ -144,7 +188,7 @@ Deux défauts **déjà présents avant l'audit** ont été trouvés par ces test
 
 ## 4. Banc de test (dans le dépôt)
 
-Fichiers : `tests/security/harness.php` (le banc), [tests/security/RESULTATS.md](tests/security/RESULTATS.md) (résultats détaillés et historique), `tests/security/dernier-resultat.txt` (trace brute de la dernière exécution).
+Fichiers : `tests/security/pentest.php` (test d'intrusion actif, voir `COMMANDES.md`), `tests/security/postman/` (collection Postman), `docs/openapi.yaml` (documentation Swagger), `tests/security/harness.php` (le banc, 160 contrôles dont la limitation des tentatives), [tests/security/RESULTATS.md](tests/security/RESULTATS.md) (résultats détaillés et historique), `tests/security/dernier-resultat.txt` (trace brute de la dernière exécution).
 
 ```bash
 php tests/security/harness.php              # environnement de test
@@ -177,4 +221,8 @@ Il démarre le noyau Symfony dans un environnement isolé, sur SQLite en mémoir
 | 15 | Moyenne | `APP_ENV=dev` par défaut | **À faire** en production |
 | 16 | Basse | Divers | Partiel |
 | B | — | 32 avis de dépendances | Corrigé |
+| D1 | Critique | Contournement du contrôle d'accès par double slash (`/admin/user-subscribe//`) : liste de tous les abonnements lisible par un utilisateur normal | **Corrigé** (2026-11-18) |
+| D2 | Haute | Aucune limitation des tentatives de connexion | **Corrigé** (2026-11-18) : 5 échecs par IP et e-mail, 30 par IP, sur 15 minutes |
+| D3 | Moyenne | Aucune limitation des inscriptions ni plafond de taille sur les recettes | Inscriptions **corrigées** (10 par heure et par IP) ; plafond de taille non traité |
+| D4 | Basse | Aucun en-tête de sécurité HTTP, version de PHP exposée | Non traité (plateforme ou écouteur) |
 | C4 | Basse | Suppression de compte bloquée par les clés étrangères | Non traité |

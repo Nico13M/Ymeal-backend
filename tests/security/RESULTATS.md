@@ -2,7 +2,7 @@
 
 Généré le 2026-11-18 par `php tests/security/harness.php` (branche `Fix/securite`).
 
-**Résultat : 150 contrôles réussis, 0 échec(s).** Même résultat avec `HENV=prod` (configuration de production, debug désactivé).
+**Résultat : 160 contrôles réussis, 0 échec(s).** Même résultat avec `HENV=prod` (configuration de production, debug désactivé).
 
 Trace brute de cette exécution : [dernier-resultat.txt](dernier-resultat.txt).
 
@@ -14,7 +14,9 @@ Trace brute de cette exécution : [dernier-resultat.txt](dernier-resultat.txt).
 | 2026-11-17 | Après les corrections de l'audit | 69 OK, 0 échec |
 | 2026-11-18 | + e-mail des auteurs de notes masqué | 70 OK, 0 échec |
 | 2026-11-18 | + usages normaux (non-régression) et recherche réparée | 122 OK, 0 échec |
-| 2026-11-18 | + toutes les routes, contournements, entrées hostiles, écouteur d'erreurs | **150 OK, 0 échec** |
+| 2026-11-18 | + toutes les routes, contournements, entrées hostiles, écouteur d'erreurs | 150 OK, 0 échec |
+| 2026-11-18 | Après correction du contournement par double slash (le banc ne change pas) | 150 OK, 0 échec |
+| 2026-11-18 | + limitation des tentatives de connexion et d'inscription (section 10.7c : 10 contrôles) | **160 OK, 0 échec** (aussi avec `HENV=prod`) |
 
 Les 42 échecs de la première ligne correspondent aux failles de l'audit (usurpation par `X-User-Id`, absence de contrôle d'accès, recettes privées lisibles, etc.).
 
@@ -202,6 +204,37 @@ Les 42 échecs de la première ligne correspondent aux failles de l'audit (usurp
 
 > La section 10 parcourt automatiquement les 81 routes déclarées de l'application.
 
+## Test d'intrusion et collection Postman (2026-11-18)
+
+Tests actifs sur une instance locale en configuration de production, base SQLite jetable. Ils complètent le banc ci-dessus.
+
+| Outil | Avant correction | Après correction |
+|---|---|---|
+| Collection Postman (`tests/security/postman/`, newman, 143 vérifications) | 142 OK, 1 échec (version de PHP exposée) | inchangé |
+| `tests/security/pentest.php` | 133 OK, 16 échecs dont **3 critiques** | 137 OK, 12 échecs, 0 critique (après le correctif du double slash) |
+| `tests/security/pentest.php` | 137 OK, 12 échecs | **141 OK, 10 échecs, 0 critique, 0 haute** (après la limitation des tentatives) |
+
+**Faille critique trouvée puis corrigée** : `GET /admin/user-subscribe//` donnait à un utilisateur normal la liste complète des abonnements (règle `access_control` trop étroite). Plus aucun contournement par chemin après correction.
+
+**Corrigé ensuite** : limitation des tentatives de connexion (429 dès le 6e essai, `Retry-After`, bon mot de passe refusé pendant le blocage) et des inscriptions (10 par heure et par IP). Temps de réponse de la connexion identique pour un compte existant et inconnu (525 ms contre 529 ms).
+
+**Échecs restants** (non corrigés, voir `SECURITY_AUDIT.md`, points D3 et D4) : pas de plafond de taille sur les recettes (moyenne), pas d'en-têtes de sécurité HTTP et version de PHP exposée (basses). Les échecs `TRACK` et `FOO` (code 501) viennent du serveur de test `php -S`, pas de l'application.
+
+**Couverture du test d'intrusion** : jetons (signature, `alg: none`, charge utile, expiration, transport), contournements de chemin (casse, `//`, `/./`, encodages, méthodes), énumération d'identifiants (IDOR), escalade de rôle par champs en trop, environ 200 injections sur 13 routes, formats et tailles de corps, fichiers sensibles, en-tête Host et CRLF, URL d'image dangereuses, CSRF et CORS, temps de réponse (énumération de comptes), concurrence (inscription et notes simultanées), génération IA et export sans service externe.
+
+## Test total avant commit (2026-11-18)
+
+| Contrôle | Résultat |
+|---|---|
+| `php -l` sur les fichiers PHP modifiés, `lint:container`, `lint:yaml config`, `composer validate`, `composer audit` | OK, aucun avis de sécurité |
+| Banc interne (`harness.php`), environnement de test | **160 OK, 0 échec** |
+| Banc interne, `HENV=prod` | **160 OK, 0 échec** |
+| Collection Postman (newman, 149 requêtes, serveur réel, production, base neuve) | 142 OK sur 143 (version de PHP exposée) |
+| `pentest.php` (serveur réel, production, base neuve) | 140 OK, 10 écarts, 14 informations, **0 critique, 0 haute** |
+| En-tête CORS `Access-Control-Expose-Headers: retry-after` | présent |
+
+Écarts restants du test d'intrusion : cinq en-têtes de sécurité HTTP absents et version de PHP visible (basses), pas de plafond de taille des recettes (moyenne), et `TRACK`/`FOO` qui renvoient 501 sur le serveur de test `php -S` (sans objet).
+
 ## Ce que ces tests ne couvrent pas
 
 - PostgreSQL et la migration `Version20261117100000` (les tests tournent sur SQLite en mémoire).
@@ -216,4 +249,11 @@ Les 42 échecs de la première ligne correspondent aux failles de l'audit (usurp
 php tests/security/harness.php              # environnement de test
 HENV=prod php tests/security/harness.php    # configuration de production
 HDEBUG=1 php tests/security/harness.php     # détail des erreurs 500 en cas d'échec
+```
+
+Test d'intrusion (serveur local sur une base jetable, voir `COMMANDES.md` section 7) :
+
+```bash
+php tests/security/pentest.php
+npx newman run tests/security/postman/ymeal-securite.postman_collection.json
 ```

@@ -51,7 +51,9 @@ function check(string $name, bool $ok, string $detail = ''): void {
 
 function call(string $method, string $uri, array $o = []): array {
     global $kernel;
-    $server = ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json', 'HTTPS' => 'on'];
+    $GLOBALS['ipn'] = ($GLOBALS['ipn'] ?? 0) + 1; // IP distincte par appel : les limites par IP ne s'accumulent pas entre tests
+    $server = ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json', 'HTTPS' => 'on',
+        'REMOTE_ADDR' => $o['ip'] ?? ('10.' . (intdiv($GLOBALS['ipn'], 65000) % 250) . '.' . (intdiv($GLOBALS['ipn'], 250) % 250) . '.' . ($GLOBALS['ipn'] % 250 + 1))];
     if (!empty($o['token'])) $server['HTTP_AUTHORIZATION'] = 'Bearer ' . $o['token'];
     foreach (($o['headers'] ?? []) as $h => $v) $server['HTTP_' . strtoupper(str_replace('-', '_', $h))] = $v;
     $body = isset($o['raw']) ? $o['raw'] : (array_key_exists('body', $o) ? json_encode($o['body']) : null);
@@ -485,6 +487,31 @@ check('donnée mal typée (tableau à la place d\'un texte) -> 400 JSON', $st ==
 [$st, $j] = as_($root_, 'DELETE', "/admin/ingredients/$ingId/delete");
 check('supprimer un ingrédient encore utilisé -> 409 JSON (et pas 500)', $st === 409, "status=$st " . json_encode($j));
 check('la réponse 409 ne contient aucun détail SQL', !preg_match('/SQLSTATE|constraint|foreign key/i', json_encode($j)), json_encode($j));
+
+// ---- 10.7c Limitation des tentatives (anti force brute) ----
+$IPX = '203.0.113.50'; $IPY = '203.0.113.51';
+register('rl-a@example.test', $PW, 'RlA'); register('rl-b@example.test', $PW, 'RlB'); // comptes dédiés (alice et bob ont changé de mot de passe plus haut)
+$lg = fn(string $email, string $pw, string $ip) => call('POST', '/admin/auth/login', ['ip' => $ip, 'body' => ['email' => $email, 'password' => $pw]]);
+$codes = []; for ($i = 0; $i < 7; $i++) { [$st] = $lg('rl-a@example.test', "faux-$i", $IPX); $codes[] = $st; }
+check('connexion : 5 échecs puis 429 (même IP et même e-mail)', array_slice($codes, 0, 5) === [401,401,401,401,401] && $codes[5] === 429 && $codes[6] === 429, implode(',', $codes));
+[$st, $j, $r] = $lg('rl-a@example.test', $PW, $IPX);
+check('connexion : bon mot de passe aussi bloqué pendant la fenêtre (pas de contournement)', $st === 429, "status=$st");
+check('429 : en-tête Retry-After présent et positif', (int) $r->headers->get('Retry-After') > 0, (string) $r->headers->get('Retry-After'));
+check('429 : réponse JSON générique', ($j['error'] ?? '') === 'Too many attempts, try again later', json_encode($j));
+[$st] = $lg('rl-a@example.test', $PW, $IPY);
+check('connexion : une autre IP n\'est pas bloquée par l\'échec d\'une IP (pas de blocage global du compte)', $st === 200, "status=$st");
+$codes = []; for ($i = 0; $i < 4; $i++) { [$st] = $lg('rl-b@example.test', "faux-$i", '203.0.113.52'); $codes[] = $st; }
+[$stOk] = $lg('rl-b@example.test', $PW, '203.0.113.52');
+$codes2 = []; for ($i = 0; $i < 4; $i++) { [$st] = $lg('rl-b@example.test', "faux-$i", '203.0.113.52'); $codes2[] = $st; }
+check('connexion réussie : le compteur repart de zéro (4 échecs, succès, 4 échecs sans 429)', !in_array(429, array_merge($codes, [$stOk], $codes2), true) && $stOk === 200, implode(',', $codes) . " ok=$stOk " . implode(',', $codes2));
+$codes = []; for ($i = 0; $i < 33; $i++) { [$st] = $lg("inconnu$i@example.test", 'x', '203.0.113.53'); $codes[] = $st; }
+check('connexion : limite par IP (30 e-mails différents, puis 429)', $codes[29] === 401 && $codes[30] === 429, 'codes 30..33: ' . implode(',', array_slice($codes, 29)));
+$codes = []; for ($i = 0; $i < 12; $i++) { [$st] = call('POST', '/admin/auth/register', ['ip' => '203.0.113.54', 'body' => ['firstname' => 'R', 'lastname' => 'R', 'email' => "rate$i@example.test", 'password' => $PW]]); $codes[] = $st; }
+check('inscription : 10 par heure et par IP, puis 429', count(array_filter($codes, fn($c) => $c === 201)) === 10 && $codes[10] === 429 && $codes[11] === 429, implode(',', $codes));
+[$st] = call('POST', '/admin/auth/register', ['ip' => '203.0.113.55', 'body' => ['firstname' => 'R', 'lastname' => 'R', 'email' => 'rate-autre-ip@example.test', 'password' => $PW]]);
+check('inscription : une autre IP n\'est pas bloquée', $st === 201, "status=$st");
+[$st] = $lg('', '', '203.0.113.56'); [$st2] = $lg(str_repeat('a', 5000) . '@x.test', 'x', '203.0.113.56');
+check('connexion : e-mail vide ou énorme -> pas de 500', $st < 500 && $st2 < 500, "$st/$st2");
 
 // ---- 10.8 Aucune réponse ne contient de secret ----
 $all = implode("\n", $GLOBALS['bodies'] ?? []);

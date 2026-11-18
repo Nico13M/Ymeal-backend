@@ -7,6 +7,8 @@ nelmio_cors:
         # X-User-Id n'est plus accepté : l'identité vient uniquement du jeton signé (Authorization: Bearer)
         allow_headers: ['Content-Type', 'X-CSRF-TOKEN', 'Authorization']
         allow_methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
+        # Retry-After (réponses 429) doit être exposé pour que le front puisse le lire en CORS
+        expose_headers: ['Retry-After']
         allow_credentials: true
         max_age: 3600
     paths:

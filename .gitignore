@@ -11,3 +11,20 @@
 /var/
 /vendor/
 ###< symfony/framework-bundle ###
+
+###> projet Ymeal ###
+# Fichiers du système et de l'éditeur
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# Bases locales (SQLite de développement ou de test) et sauvegardes
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+
+# Fichiers produits par les tests d'intrusion
+/tests/security/*.tmp
+/tests/security/jar.txt
+###< projet Ymeal ###

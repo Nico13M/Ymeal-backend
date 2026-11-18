@@ -28,6 +28,11 @@ class AdminUserSubscribeController extends AbstractController
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request, EntityManagerInterface $em, UserSubscriptionRepository $userSubscriptionRepository): Response
     {
+        // Défense en profondeur : la liste complète est réservée aux administrateurs,
+        // même si une variante de chemin échappe à la règle de security.yaml.
+        if (!$this->userManager->isAdmin()) {
+            return $this->userManager->forbidden();
+        }
         $list = $this->userSubscriptionManager->listAll();
         return $this->json($list);
     }

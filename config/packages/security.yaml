@@ -35,7 +35,8 @@ security:
         - { path: ^/admin/auth/(login|register)$, roles: PUBLIC_ACCESS }
         - { path: ^/admin/security/csrf-token$, roles: PUBLIC_ACCESS }
         # --- Réservé aux administrateurs ---
-        - { path: ^/admin/user-subscribe/?$, roles: ROLE_ADMIN }
+        # `/*` et non `/?` : sinon `/admin/user-subscribe//` contourne la règle (testé à l'audit du 2026-11-18)
+        - { path: ^/admin/user-subscribe/*$, roles: ROLE_ADMIN }
         - { path: ^/admin/(ingredients|units|diet|subscribe|user-subscribe)(/|$), roles: ROLE_ADMIN, methods: [POST, PUT, PATCH, DELETE] }
         # --- Tout le reste de l'API exige un utilisateur connecté ---
         - { path: ^/, roles: ROLE_USER }

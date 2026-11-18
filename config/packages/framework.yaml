@@ -7,11 +7,40 @@ framework:
         cookie_samesite: none
         cookie_secure: true
 
+    # Derrière le routeur de la plateforme (Scalingo), l'adresse IP du client n'est lue dans
+    # X-Forwarded-For que si TRUSTED_PROXIES est défini (ex. « REMOTE_ADDR » ou une liste d'IP/CIDR).
+    # Sans cela, tous les clients partagent l'IP du routeur et les limites ci-dessous les visent ensemble.
+    trusted_proxies: '%env(default::TRUSTED_PROXIES)%'
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port']
+
+    # Limitation des tentatives (anti force brute). Appliquée dans AdminAuthController.
+    rate_limiter:
+        # Par couple IP + e-mail : 5 échecs toutes les 15 minutes (remis à zéro après une connexion réussie)
+        login_account:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'
+        # Par IP, tous e-mails confondus (anti-pulvérisation de mots de passe)
+        login_ip:
+            policy: sliding_window
+            limit: 30
+            interval: '15 minutes'
+        # Inscriptions par IP
+        register_ip:
+            policy: sliding_window
+            limit: 10
+            interval: '1 hour'
+
     #esi: true
     #fragments: true
 
 when@test:
     framework:
         test: true
+        # Le banc de test (tests/security/harness.php) crée des centaines de comptes : pas de limite en test.
+        rate_limiter:
+            login_account: { policy: no_limit }
+            login_ip: { policy: no_limit }
+            register_ip: { policy: no_limit }
         session:
             storage_factory_id: session.storage.factory.mock_file

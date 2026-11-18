@@ -5,13 +5,17 @@ namespace App\Entity;
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Gedmo\Timestampable\Traits\TimestampableEntity;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
+#[UniqueEntity(fields: ['email'], message: 'Email already used')]
 class User implements PasswordAuthenticatedUserInterface, UserInterface
 {
  
@@ -28,8 +32,18 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     #[ORM\Column(length: 45)]
     private ?string $lastname = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 255, unique: true)]
+    #[Assert\Email]
+    #[Assert\Length(max: 255)]
     private ?string $email = null;
+
+    /**
+     * Rôles supplémentaires (ex. ROLE_ADMIN). ROLE_USER est toujours ajouté par getRoles().
+     *
+     * @var string[]
+     */
+    #[ORM\Column(type: Types::JSON)]
+    private array $roles = [];
 
     #[ORM\Column(length: 255)]
     private ?string $password_hash = null;
@@ -157,8 +171,15 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
 
     public function getRoles(): array
     {
-        // return a default role; you can adapt to store roles in DB later
-        return ['ROLE_USER'];
+        return array_values(array_unique(array_merge(['ROLE_USER'], $this->roles)));
+    }
+
+    /** @param string[] $roles */
+    public function setRoles(array $roles): static
+    {
+        $this->roles = array_values(array_unique(array_filter($roles, 'is_string')));
+
+        return $this;
     }
 
     public function eraseCredentials(): void

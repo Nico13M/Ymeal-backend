@@ -26,14 +26,14 @@ class UserEditType extends AbstractType
                 'required' => false,
                 'constraints' => [
                     new Assert\NotBlank(),
-                    new Assert\Length(['max' => 100]),
+                    new Assert\Length(['max' => 45]),
                 ],
             ])
             ->add('lastname', TextType::class, [
                 'required' => false,
                 'constraints' => [
                     new Assert\NotBlank(),
-                    new Assert\Length(['max' => 100]),
+                    new Assert\Length(['max' => 45]),
                 ],
             ]);
     }

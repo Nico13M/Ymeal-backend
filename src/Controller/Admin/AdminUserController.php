@@ -5,6 +5,7 @@ namespace App\Controller\Admin;
 use App\Entity\User;
 use App\Form\UserEditType;
 use App\Repository\UserRepository;
+use App\Service\AuthManager;
 use App\Service\CsrfService;
 use App\Service\UserManager;
 use Doctrine\ORM\EntityManagerInterface;
@@ -22,11 +23,15 @@ class AdminUserController extends AbstractController
     {
     }
 
+    /** Liste de tous les comptes : réservée aux administrateurs. */
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request, UserRepository $userRepository): Response
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
+        }
+        if (!$this->userManager->isAdmin()) {
+            return $this->userManager->forbidden();
         }
 
         $users = $userRepository->findAll();
@@ -35,17 +40,20 @@ class AdminUserController extends AbstractController
         return $this->json($data);
     }
 
-    #[Route('/{id}', name: 'show', methods: ['GET'])]
+    #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function show(Request $request, User $user): Response
     {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
         }
+        if (!$this->userManager->canAccessUserId($user->getId())) {
+            return $this->userManager->forbidden();
+        }
 
         return $this->json($this->userManager->serializeUser($user));
     }
 
-    #[Route('/{id}/edit', name: 'edit', methods: ['PATCH'])]
+    #[Route('/{id}/edit', name: 'edit', methods: ['PATCH'], requirements: ['id' => '\d+'])]
     public function edit(
         Request $request,
         User $user,
@@ -53,12 +61,11 @@ class AdminUserController extends AbstractController
         UserPasswordHasherInterface $passwordHasher,
         CsrfService $csrfService
     ): Response {
-        if (!$user) {
-            return $this->json(['error' => 'User not found'], 404);
-        }
-
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
+        }
+        if (!$this->userManager->canAccessUserId($user->getId())) {
+            return $this->userManager->forbidden();
         }
 
         // Vérification CSRF
@@ -67,13 +74,37 @@ class AdminUserController extends AbstractController
             return $this->json(['error' => 'Invalid CSRF token'], Response::HTTP_FORBIDDEN);
         }
 
-        // if ($this->getUser() !== $user && !$this->isGranted('ROLE_ADMIN')) {
-        //     return $this->json(['error' => 'Forbidden'], 403);
-        // }
-
         $data = json_decode($request->getContent(), true);
         if (!is_array($data)) {
             return $this->json(['error' => 'Invalid JSON'], 400);
+        }
+
+        $newPassword = $data['password'] ?? null;
+        if ($newPassword !== null && (!is_string($newPassword) || $newPassword === '')) {
+            return $this->json(['error' => 'Invalid password'], 400);
+        }
+        if ($newPassword !== null) {
+            if (mb_strlen($newPassword) < AuthManager::MIN_PASSWORD_LENGTH) {
+                return $this->json(['error' => 'Password too short (min ' . AuthManager::MIN_PASSWORD_LENGTH . ' characters)'], 422);
+            }
+            if (strlen($newPassword) > 4096) {
+                return $this->json(['error' => 'Password too long'], 422);
+            }
+        }
+
+        if (isset($data['email'])) {
+            $data['email'] = AuthManager::normalizeEmail($data['email']);
+        }
+        $emailChanges = isset($data['email']) && $data['email'] !== $user->getEmail();
+
+        // Changer son mot de passe ou son e-mail (identifiant de connexion) exige de prouver
+        // qu'on connaît le mot de passe actuel : un jeton volé ne suffit plus à prendre le compte.
+        $isOwnAccount = $this->getUser() instanceof User && $this->getUser()->getId() === $user->getId();
+        if ($isOwnAccount && ($newPassword !== null || $emailChanges)) {
+            $current = $data['current_password'] ?? null;
+            if (!is_string($current) || !$passwordHasher->isPasswordValid($user, $current)) {
+                return $this->json(['error' => 'current_password required and must be valid'], Response::HTTP_FORBIDDEN);
+            }
         }
 
         $form = $this->createForm(UserEditType::class, $user, [
@@ -87,10 +118,8 @@ class AdminUserController extends AbstractController
             ], 422);
         }
 
-        if (!empty($data['password'])) {
-            $user->setPasswordHash(
-                $passwordHasher->hashPassword($user, $data['password'])
-            );
+        if ($newPassword !== null) {
+            $user->setPasswordHash($passwordHasher->hashPassword($user, $newPassword));
         }
 
         $em->flush();
@@ -98,7 +127,7 @@ class AdminUserController extends AbstractController
         return $this->json($this->userManager->serializeUser($user), 200);
     }
 
-    #[Route('/{id}/delete', name: 'delete', methods: ['DELETE'])]
+    #[Route('/{id}/delete', name: 'delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]
     public function delete(
         Request $request,
         User $user,
@@ -107,6 +136,9 @@ class AdminUserController extends AbstractController
     ): JsonResponse {
         if ($err = $this->userManager->ensureAuthenticated($request)) {
             return $err;
+        }
+        if (!$this->userManager->canAccessUserId($user->getId())) {
+            return $this->userManager->forbidden();
         }
 
         // Vérification CSRF

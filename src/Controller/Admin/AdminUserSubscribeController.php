@@ -6,6 +6,7 @@ use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
 use App\Repository\UserSubscriptionRepository;
 use App\Service\CsrfService;
+use App\Service\UserManager;
 use App\Service\UserSubscriptionManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,13 +19,20 @@ use Symfony\Component\Routing\Attribute\Route;
 class AdminUserSubscribeController extends AbstractController
 {
 
-    public function __construct(private UserSubscriptionManager $userSubscriptionManager)
-    {
+    public function __construct(
+        private UserSubscriptionManager $userSubscriptionManager,
+        private UserManager $userManager,
+    ) {
     }
     
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request, EntityManagerInterface $em, UserSubscriptionRepository $userSubscriptionRepository): Response
     {
+        // Défense en profondeur : la liste complète est réservée aux administrateurs,
+        // même si une variante de chemin échappe à la règle de security.yaml.
+        if (!$this->userManager->isAdmin()) {
+            return $this->userManager->forbidden();
+        }
         $list = $this->userSubscriptionManager->listAll();
         return $this->json($list);
     }
@@ -37,7 +45,7 @@ class AdminUserSubscribeController extends AbstractController
         int $subscriptionId,
         UserSubscriptionManager $manager
     ): JsonResponse {
-        $csrfToken = $request->headers->get('X-CSRF-TOKEN');
+        $csrfToken = (string) $request->headers->get('X-CSRF-TOKEN');
         $data = json_decode($request->getContent(), true) ?? [];
         $startDateStr = $data['start_date'] ?? '';
         $endDateStr = $data['end_date'] ?? '';
@@ -52,7 +60,7 @@ class AdminUserSubscribeController extends AbstractController
         } catch (HttpException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getStatusCode());
         } catch (\Exception $e) {
-            return $this->json(['error' => $e->getMessage()], 500);
+            return $this->json(['error' => 'Internal error'], 500);
         }
 
     }
@@ -65,7 +73,7 @@ class AdminUserSubscribeController extends AbstractController
         int $subscriptionId,
         UserSubscriptionManager $manager
     ): JsonResponse {
-        $csrfToken = $request->headers->get('X-CSRF-TOKEN');
+        $csrfToken = (string) $request->headers->get('X-CSRF-TOKEN');
         $data = json_decode($request->getContent(), true) ?? [];
 
         try {
@@ -74,7 +82,7 @@ class AdminUserSubscribeController extends AbstractController
         } catch (HttpException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getStatusCode());
         } catch (\Exception $e) {
-            return $this->json(['error' => $e->getMessage()], 500);
+            return $this->json(['error' => 'Internal error'], 500);
         }
     }
 
@@ -83,6 +91,9 @@ class AdminUserSubscribeController extends AbstractController
         int $userId,
         UserSubscriptionManager $manager
     ): JsonResponse {
+        if (!$this->userManager->canAccessUserId($userId)) {
+            return $this->userManager->forbidden();
+        }
         try {
             return $this->json($manager->showByUser($userId));
         } catch (HttpException $e) {
@@ -96,27 +107,32 @@ class AdminUserSubscribeController extends AbstractController
         UserSubscriptionManager $manager
     ): JsonResponse {
         try {
-            return $this->json($manager->show($id));
+            $subscription = $manager->show($id);
+            if (!$this->userManager->canAccessUserId($subscription['UserId'] ?? null)) {
+                return $this->userManager->forbidden();
+            }
+
+            return $this->json($subscription);
         } catch (HttpException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getStatusCode());
         }
     }
 
 
-    #[Route('/{userSubscriptionId}/delete', name: 'user_subscription_delete', methods: ['DELETE'])]
+    #[Route('/{userId}/{subscriptionId}/delete', name: 'user_subscription_delete', methods: ['DELETE'], requirements: ['userId' => '\d+', 'subscriptionId' => '\d+'])]
     public function deleteUserSubscription(
         Request $request,
         int $userId,
         int $subscriptionId,
         UserSubscriptionManager $manager
     ): JsonResponse {
-        $csrfToken = $request->headers->get('X-CSRF-TOKEN');
+        $csrfToken = (string) $request->headers->get('X-CSRF-TOKEN');
         try {
             $manager->delete($userId, $subscriptionId, $csrfToken);
             return $this->json(null, Response::HTTP_NO_CONTENT);
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getStatusCode());
         } catch (\Exception $e) {
-            return $this->json(['error' => $e->getMessage()], 500);
+            return $this->json(['error' => 'Internal error'], 500);
         }
     }}

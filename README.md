@@ -64,3 +64,82 @@ Les services permettent d’alléger le **controller**. Ils constituent le **Mod
 
 > Un service peut être intégré dans un controller en l’injectant en paramètre d’une méthode.
 >
+
+# Sécurité et mise en route
+
+Le détail de l'audit et des corrections est dans [SECURITY_AUDIT.md](SECURITY_AUDIT.md).
+
+## Variables d'environnement à ajouter
+
+- **APP_SECRET** : 32 caractères minimum (sinon l'API refuse de signer les jetons). Générer avec `php -r "echo bin2hex(random_bytes(32));"`. À mettre dans `.env.local`, jamais dans un fichier commité.
+- **EXTERNAL_API_TOKEN** : jeton du service externe de l'export de données (sans lui, l'export échoue volontairement).
+- **PYTHON_API_URL** : URL du service Python de génération de recettes.
+- En production : `APP_ENV=prod` et `APP_DEBUG=0`.
+
+## Authentification
+
+Il n'y a plus de `X-User-Id`. La connexion (`POST /admin/auth/login`) et l'inscription (`POST /admin/auth/register`) renvoient `data.token`. Le front l'envoie ensuite dans chaque requête :
+
+```
+Authorization: Bearer <token>
+```
+
+- Le jeton expire au bout de 7 jours et devient invalide si le mot de passe change : le front doit alors renvoyer vers la connexion (réponse 401).
+- Mot de passe : 12 caractères minimum. Changer son mot de passe ou son e-mail demande `current_password` dans la requête.
+- Sans jeton valide, toute route répond 401, sauf `/`, `/admin/auth/login`, `/admin/auth/register` et `/admin/security/csrf-token`.
+
+## Administrateurs
+
+Seuls les comptes `ROLE_ADMIN` peuvent créer, modifier ou supprimer les ingrédients, unités, régimes et abonnements, et voir la liste de tous les utilisateurs. Un utilisateur normal reçoit 403.
+
+```bash
+php bin/console app:user:promote email@exemple.fr            # donner le rôle admin
+php bin/console app:user:promote email@exemple.fr --revoke   # le retirer
+```
+
+## Base de données
+
+Après avoir récupéré la branche, appliquer la migration (elle ajoute les rôles et rend l'e-mail unique, en minuscules). Elle échoue s'il existe deux comptes avec le même e-mail : corriger les doublons puis relancer. Faire une sauvegarde avant.
+
+```bash
+php bin/console doctrine:migrations:migrate
+```
+
+### Base de développement locale (SQLite)
+
+Pour développer sans serveur PostgreSQL, mettre dans `.env.local` :
+
+```
+DATABASE_URL="sqlite:///%kernel.project_dir%/var/data_dev.db"
+```
+
+puis créer les tables (pas de migration, elles sont écrites pour PostgreSQL) :
+
+```bash
+php bin/console doctrine:schema:create
+```
+
+Limite : la reconnaissance automatique des ingrédients dans un texte de recette générée par l'IA utilise une fonction PostgreSQL et ne marche pas sous SQLite. La production utilise PostgreSQL avec les migrations.
+
+## Tests de sécurité
+
+```bash
+php tests/security/harness.php              # 150 contrôles, SQLite en mémoire, sans toucher à votre base
+HENV=prod php tests/security/harness.php    # avec la configuration de production
+```
+
+Résultats et historique : [tests/security/RESULTATS.md](tests/security/RESULTATS.md). À relancer après toute modification touchant l'authentification, les droits ou les routes.
+
+## Dépendances
+
+```bash
+composer audit    # doit afficher « No security vulnerability advisories found »
+```
+
+# Documentation du projet
+
+- [COMMANDES.md](COMMANDES.md) : toutes les commandes (installation, lancement, base de données, tests, déploiement, dépannage).
+- [SECURITY_AUDIT.md](SECURITY_AUDIT.md) : audit de sécurité, corrections faites et reste à faire.
+- [FRONT_CHANGES.md](FRONT_CHANGES.md) : ce que les corrections de sécurité changent pour le front.
+- [docs/openapi.yaml](docs/openapi.yaml) et [docs/swagger.html](docs/swagger.html) : documentation de l'API (Swagger).
+- [tests/security/RESULTATS.md](tests/security/RESULTATS.md) : résultats détaillés des tests de sécurité (banc interne, Postman, test d'intrusion).

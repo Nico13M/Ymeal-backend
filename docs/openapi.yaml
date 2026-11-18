@@ -1,0 +1,977 @@
+openapi: 3.0.3
+info:
+  title: Ymeal API
+  version: 1.0.0
+  description: |
+    API du back Ymeal (Symfony).
+
+    **Authentification** : `POST /admin/auth/login` ou `/admin/auth/register` renvoient `data.token`.
+    Envoyer ensuite `Authorization: Bearer <token>` sur toutes les autres routes.
+    Le jeton expire après 7 jours et devient invalide si le mot de passe change (401).
+
+    **CSRF** : récupérer un jeton avec `GET /admin/security/csrf-token` et l'envoyer dans l'en-tête
+    `X-CSRF-TOKEN` sur les écritures (POST, PUT, PATCH, DELETE). Seules les routes d'authentification
+    et `POST /admin/recipes/create` ne le vérifient pas ; le plus sûr est de l'envoyer partout.
+
+    **Rôles** : `PUBLIC` (aucun jeton), `USER` (connecté), `ADMIN`. Un utilisateur ne peut accéder
+    qu'à ses propres ressources (compte, abonnements, recettes privées) : sinon 403. Les écritures sur
+    ingrédients, unités, régimes, offres d'abonnement et user-subscribe sont réservées à l'ADMIN.
+
+    **Erreurs** : JSON `{ "error": "message" }`. 400 donnée invalide, 401 non authentifié, 403 interdit,
+    404 introuvable, 409 conflit (doublon ou élément encore utilisé).
+servers:
+  - url: http://127.0.0.1:8000
+    description: Local
+tags:
+  - name: Auth
+  - name: Utilisateurs
+  - name: Préférences
+  - name: Recettes
+  - name: Ingrédients de recette
+  - name: Notes
+  - name: Frigo
+  - name: Ingrédients
+  - name: Unités
+  - name: Régimes
+  - name: Abonnements
+  - name: Abonnements utilisateurs
+  - name: Référentiels
+  - name: IA
+  - name: Sécurité
+security:
+  - bearerAuth: []
+paths:
+  /:
+    get:
+      tags: [Sécurité]
+      summary: Accueil de l'API
+      description: Rôle PUBLIC.
+      security: []
+      responses:
+        '200': { description: OK }
+  /admin/security/csrf-token:
+    get:
+      tags: [Sécurité]
+      summary: Obtenir un jeton CSRF
+      description: Rôle PUBLIC.
+      security: []
+      responses:
+        '200':
+          description: Jeton CSRF
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  csrfToken: { type: string }
+  /admin/auth/register:
+    post:
+      tags: [Auth]
+      summary: Inscription
+      description: Rôle PUBLIC. Mot de passe de 12 caractères minimum, e-mail unique (insensible à la casse), prénom et nom de 45 caractères maximum. Limité à 10 inscriptions par heure et par IP (puis 429).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstname, lastname, email, password]
+              properties:
+                firstname: { type: string, maxLength: 45 }
+                lastname: { type: string, maxLength: 45 }
+                pseudo: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 12 }
+      responses:
+        '201':
+          description: Compte créé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /admin/auth/login:
+    post:
+      tags: [Auth]
+      summary: Connexion
+      description: Rôle PUBLIC. Même erreur 401 que le compte existe ou non. Limité à 5 échecs par IP et e-mail et 30 par IP sur 15 minutes (puis 429).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Connecté
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /admin/user/:
+    get:
+      tags: [Utilisateurs]
+      summary: Lister tous les comptes
+      description: Rôle ADMIN.
+      responses:
+        '200': { description: Liste des comptes }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/user/{id}:
+    get:
+      tags: [Utilisateurs]
+      summary: Lire un compte
+      description: Propriétaire du compte ou ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Compte (sans mot de passe) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/user/{id}/edit:
+    patch:
+      tags: [Utilisateurs]
+      summary: Modifier un compte
+      description: Propriétaire ou ADMIN. `current_password` est obligatoire pour changer le mot de passe ou l'e-mail. Les champs `roles` ou `password_hash` sont ignorés.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstname: { type: string, maxLength: 45 }
+                lastname: { type: string, maxLength: 45 }
+                pseudo: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 12 }
+                current_password: { type: string }
+      responses:
+        '200': { description: Compte modifié }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/user/{id}/delete:
+    delete:
+      tags: [Utilisateurs]
+      summary: Supprimer un compte
+      description: Propriétaire ou ADMIN. Renvoie 409 si le compte a encore des recettes (limitation connue).
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      responses:
+        '200': { description: Supprimé }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /admin/user/preferences/diets:
+    get:
+      tags: [Préférences]
+      summary: Régimes de l'utilisateur connecté
+      description: Rôle USER.
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Préférences]
+      summary: Définir ses régimes
+      description: Rôle USER.
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                diet_ids: { type: array, items: { type: integer } }
+      responses: { '200': { description: Régimes mis à jour } }
+  /admin/user/preferences/budget:
+    get:
+      tags: [Préférences]
+      summary: Budget de l'utilisateur connecté
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Préférences]
+      summary: Définir son budget
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [budget_id]
+              properties:
+                budget_id: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: OK }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/user/preferences/person-count:
+    get:
+      tags: [Préférences]
+      summary: Nombre de personnes
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Préférences]
+      summary: Définir le nombre de personnes
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [count]
+              properties:
+                count: { type: integer }
+      responses:
+        '200': { description: OK }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /admin/user/preferences/favorite-cuisines:
+    get:
+      tags: [Préférences]
+      summary: Cuisines favorites
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Préférences]
+      summary: Définir ses cuisines favorites
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cuisine_ids: { type: array, items: { type: integer } }
+      responses: { '200': { description: OK } }
+  /admin/user/preferences/blacklist:
+    get:
+      tags: [Préférences]
+      summary: Ingrédients exclus (liste noire)
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Préférences]
+      summary: Définir sa liste noire d'ingrédients
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ingredient_ids: { type: array, items: { type: integer } }
+      responses: { '200': { description: OK } }
+  /admin/user/preferences/allergies:
+    get:
+      tags: [Préférences]
+      summary: Allergies
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Préférences]
+      summary: Définir ses allergies
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                allergy_ids: { type: array, items: { type: integer } }
+      responses: { '200': { description: OK } }
+
+  /admin/recipes/index:
+    get:
+      tags: [Recettes]
+      summary: Lister les recettes visibles
+      description: Rôle USER. Recettes publiques et celles de l'utilisateur (aucun paramètre de filtre, voir /search et /count).
+      responses: { '200': { description: Liste de recettes } }
+  /admin/recipes/search:
+    get:
+      tags: [Recettes]
+      summary: Rechercher des recettes
+      description: Rôle USER. Tient compte des régimes et de la liste noire de l'utilisateur.
+      parameters:
+        - { name: servings, in: query, schema: { type: integer, default: 4 } }
+        - { name: frigo, in: query, description: Utiliser le contenu du frigo, schema: { type: boolean } }
+        - { name: ingredientsForm, in: query, description: Ingrédients recherchés, schema: { type: string } }
+      responses: { '200': { description: Résultats } }
+  /admin/recipes/create:
+    post:
+      tags: [Recettes]
+      summary: Créer une recette
+      description: Rôle USER. L'auteur est toujours l'utilisateur connecté. Le `slug` est généré par le serveur. `image` doit être une URL http(s).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecipeInput' }
+      responses:
+        '201': { description: Recette créée (champ `recipe`) }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /admin/recipes/generate:
+    post:
+      tags: [IA]
+      summary: Générer une recette par IA
+      description: Rôle USER. Appelle le service Python. Au moins `ingredient_search` ou `ingredients_selected` est requis.
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ingredient_search: { type: string }
+                ingredients_selected: { type: array, items: { type: string } }
+      responses:
+        '200': { description: Recette générée }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '502': { description: Service de génération indisponible }
+  /admin/recipes/ai/save:
+    post:
+      tags: [IA]
+      summary: Enregistrer une recette générée par IA
+      description: Rôle USER.
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipe_text]
+              properties:
+                recipe_text: { type: string }
+                is_public: { type: boolean, default: false }
+                dish_type: { type: string }
+      responses:
+        '201': { description: Recette enregistrée }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /admin/recipes/user/blacklist:
+    get:
+      tags: [Recettes]
+      summary: Liste noire d'ingrédients de l'utilisateur
+      responses: { '200': { description: OK } }
+  /admin/recipes/favorites:
+    get:
+      tags: [Recettes]
+      summary: Mes recettes favorites
+      responses: { '200': { description: OK } }
+  /admin/recipes/user/data/send:
+    post:
+      tags: [Recettes]
+      summary: Exporter les données de l'utilisateur vers le service externe
+      description: Rôle USER. Nécessite `EXTERNAL_API_TOKEN` côté serveur.
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      responses:
+        '200': { description: Envoyé }
+  /admin/recipes/trending:
+    get:
+      tags: [Recettes]
+      summary: Recettes tendances
+      responses: { '200': { description: OK } }
+  /admin/recipes/count:
+    get:
+      tags: [Recettes]
+      summary: Nombre de recettes visibles
+      parameters:
+        - { name: is_public, in: query, schema: { type: boolean } }
+        - { name: difficulty, in: query, schema: { type: string } }
+        - { name: dish_type, in: query, schema: { type: string } }
+        - { name: mine, in: query, description: Compter seulement mes recettes, schema: { type: boolean } }
+      responses: { '200': { description: OK } }
+  /admin/recipes/{id}:
+    get:
+      tags: [Recettes]
+      summary: Détail d'une recette
+      description: Publique, ou privée si l'utilisateur en est l'auteur (sinon 403/404).
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Recette (sans e-mail d'auteur) }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/recipes/{id}/edit:
+    patch:
+      tags: [Recettes]
+      summary: Modifier sa recette
+      description: Auteur ou ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecipeInput' }
+      responses:
+        '200': { description: Recette modifiée }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/recipes/{id}/delete:
+    delete:
+      tags: [Recettes]
+      summary: Supprimer sa recette
+      description: Auteur ou ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      responses:
+        '200': { description: Supprimée }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/recipes/{id}/favorite/status:
+    get:
+      tags: [Recettes]
+      summary: La recette est-elle en favori ?
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/recipes/{id}/favorite:
+    post:
+      tags: [Recettes]
+      summary: Ajouter aux favoris
+      description: Recette visible uniquement.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } }
+    delete:
+      tags: [Recettes]
+      summary: Retirer des favoris
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  /admin/recipe-ingredients/:
+    post:
+      tags: [Ingrédients de recette]
+      summary: Ajouter un ingrédient à une recette
+      description: Auteur de la recette ou ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipe_id, ingredient_id, quantity]
+              properties:
+                recipe_id: { type: integer }
+                ingredient_id: { type: integer }
+                quantity: { type: number }
+                unit_id: { type: integer }
+                unitLabel: { type: string }
+      responses:
+        '201': { description: Ajouté }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/recipe-ingredients/{id}/delete:
+    delete:
+      tags: [Ingrédients de recette]
+      summary: Retirer un ingrédient d'une recette
+      description: Auteur de la recette ou ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      responses:
+        '200': { description: Retiré }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/ratings/recipes/{recipeId}:
+    get:
+      tags: [Notes]
+      summary: Notes d'une recette
+      description: Recette visible uniquement. Les auteurs sont identifiés par leur pseudo.
+      parameters: [{ $ref: '#/components/parameters/RecipeId' }]
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/ratings/recipes/{recipeId}/me:
+    get:
+      tags: [Notes]
+      summary: Ma note sur une recette
+      parameters: [{ $ref: '#/components/parameters/RecipeId' }]
+      responses: { '200': { description: OK } }
+  /admin/ratings/create-or-update/{recipeId}:
+    post:
+      tags: [Notes]
+      summary: Noter une recette (création ou mise à jour)
+      parameters: [{ $ref: '#/components/parameters/RecipeId' }, { $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                comment: { type: string, maxLength: 2000 }
+      responses:
+        '200': { description: OK }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/ratings/delete/{recipeId}:
+    delete:
+      tags: [Notes]
+      summary: Supprimer ma note
+      parameters: [{ $ref: '#/components/parameters/RecipeId' }, { $ref: '#/components/parameters/Csrf' }]
+      responses: { '200': { description: OK } }
+
+  /admin/frigo/:
+    get:
+      tags: [Frigo]
+      summary: Contenu de mon frigo
+      responses: { '200': { description: OK } }
+  /admin/frigo/ingredients:
+    get:
+      tags: [Frigo]
+      summary: Ingrédients disponibles pour le frigo
+      responses: { '200': { description: OK } }
+  /admin/frigo/ingredients/search:
+    get:
+      tags: [Frigo]
+      summary: Rechercher un ingrédient
+      parameters: [{ name: query, in: query, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+  /admin/frigo/count:
+    get:
+      tags: [Frigo]
+      summary: Nombre d'ingrédients dans le frigo
+      responses: { '200': { description: OK } }
+  /admin/frigo/{id}:
+    post:
+      tags: [Frigo]
+      summary: Ajouter ou mettre à jour un ingrédient du frigo
+      description: "`id` = identifiant de l'ingrédient."
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity: { type: number, default: 1 }
+                unit_id: { type: integer }
+      responses: { '200': { description: Mis à jour }, '201': { description: Ajouté }, '404': { $ref: '#/components/responses/NotFound' } }
+    delete:
+      tags: [Frigo]
+      summary: Retirer un ingrédient du frigo
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  /admin/ingredients/:
+    get:
+      tags: [Ingrédients]
+      summary: Lister les ingrédients
+      description: Rôle USER.
+      responses: { '200': { description: OK } }
+  /admin/ingredients/{id}:
+    get:
+      tags: [Ingrédients]
+      summary: Détail d'un ingrédient
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/ingredients/create:
+    post:
+      tags: [Ingrédients]
+      summary: Créer un ingrédient
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                units_id: { type: integer }
+      responses:
+        '201': { description: Créé }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/ingredients/{id}/edit:
+    patch:
+      tags: [Ingrédients]
+      summary: Modifier un ingrédient
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                units_id: { type: integer }
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/ingredients/{id}/delete:
+    delete:
+      tags: [Ingrédients]
+      summary: Supprimer un ingrédient
+      description: Rôle ADMIN. 409 si l'ingrédient est utilisé.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+
+  /admin/units/index:
+    get:
+      tags: [Unités]
+      summary: Lister les unités
+      responses: { '200': { description: OK } }
+  /admin/units/create:
+    post:
+      tags: [Unités]
+      summary: Créer une unité
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                symbol: { type: string }
+      responses: { '201': { description: Créée }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/units/{id}/edit:
+    put:
+      tags: [Unités]
+      summary: Modifier une unité
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                symbol: { type: string }
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/units/{id}/delete:
+    delete:
+      tags: [Unités]
+      summary: Supprimer une unité
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+
+  /admin/diet/:
+    get:
+      tags: [Régimes]
+      summary: Lister les régimes
+      responses: { '200': { description: OK } }
+  /admin/diet/{id}/show:
+    get:
+      tags: [Régimes]
+      summary: Détail d'un régime
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/diet/user/{userId}/diets:
+    get:
+      tags: [Régimes]
+      summary: Régimes d'un utilisateur
+      description: Propriétaire ou ADMIN.
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/diet/create:
+    post:
+      tags: [Régimes]
+      summary: Créer un régime
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses: { '201': { description: Créé }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/diet/{id}/edit:
+    patch:
+      tags: [Régimes]
+      summary: Modifier un régime
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/diet/{id}/delete:
+    delete:
+      tags: [Régimes]
+      summary: Supprimer un régime
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /admin/diet/{id}/associate/{userId}:
+    post:
+      tags: [Régimes]
+      summary: Associer un régime à un utilisateur
+      description: Propriétaire du compte ou ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/UserId' }, { $ref: '#/components/parameters/Csrf' }]
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/diet/{id}/associate/{userId}/delete:
+    delete:
+      tags: [Régimes]
+      summary: Retirer un régime d'un utilisateur
+      description: Propriétaire du compte ou ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/UserId' }, { $ref: '#/components/parameters/Csrf' }]
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } }
+
+  /admin/subscribe/:
+    get:
+      tags: [Abonnements]
+      summary: Lister les offres d'abonnement
+      responses: { '200': { description: OK } }
+  /admin/subscribe/{id}/show:
+    get:
+      tags: [Abonnements]
+      summary: Détail d'une offre
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/subscribe/create:
+    post:
+      tags: [Abonnements]
+      summary: Créer une offre
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                price: { type: integer }
+                duration_months: { type: integer }
+      responses: { '201': { description: Créée }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/subscribe/{id}/edit:
+    patch:
+      tags: [Abonnements]
+      summary: Modifier une offre
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                price: { type: integer }
+                duration_months: { type: integer }
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/subscribe/{id}/delete:
+    delete:
+      tags: [Abonnements]
+      summary: Supprimer une offre
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/Csrf' }]
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+
+  /admin/user-subscribe/:
+    get:
+      tags: [Abonnements utilisateurs]
+      summary: Lister tous les abonnements des utilisateurs
+      description: Rôle ADMIN.
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/user-subscribe/{id}/show:
+    get:
+      tags: [Abonnements utilisateurs]
+      summary: Détail d'un abonnement utilisateur
+      description: Propriétaire ou ADMIN.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /admin/user-subscribe/{userId}/user/subscriptions:
+    get:
+      tags: [Abonnements utilisateurs]
+      summary: Abonnements d'un utilisateur
+      description: Propriétaire ou ADMIN.
+      parameters: [{ $ref: '#/components/parameters/UserId' }]
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/user-subscribe/{userId}/{subscriptionId}/create:
+    post:
+      tags: [Abonnements utilisateurs]
+      summary: Attribuer un abonnement à un utilisateur
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/UserId' }, { $ref: '#/components/parameters/SubscriptionId' }, { $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_date: { type: string, format: date }
+                end_date: { type: string, format: date }
+      responses: { '201': { description: Créé }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/user-subscribe/{userId}/{subscriptionId}/edit:
+    patch:
+      tags: [Abonnements utilisateurs]
+      summary: Modifier un abonnement utilisateur
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/UserId' }, { $ref: '#/components/parameters/SubscriptionId' }, { $ref: '#/components/parameters/Csrf' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_date: { type: string, format: date }
+                end_date: { type: string, format: date }
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /admin/user-subscribe/{userId}/{subscriptionId}/delete:
+    delete:
+      tags: [Abonnements utilisateurs]
+      summary: Supprimer un abonnement utilisateur
+      description: Rôle ADMIN.
+      parameters: [{ $ref: '#/components/parameters/UserId' }, { $ref: '#/components/parameters/SubscriptionId' }, { $ref: '#/components/parameters/Csrf' }]
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } }
+
+  /admin/reference/diets:
+    get:
+      tags: [Référentiels]
+      summary: Régimes disponibles
+      responses: { '200': { description: OK } }
+  /admin/reference/allergies:
+    get:
+      tags: [Référentiels]
+      summary: Allergies disponibles
+      responses: { '200': { description: OK } }
+  /admin/reference/favorite-cuisines:
+    get:
+      tags: [Référentiels]
+      summary: Cuisines disponibles
+      responses: { '200': { description: OK } }
+  /admin/reference/budgets:
+    get:
+      tags: [Référentiels]
+      summary: Budgets disponibles
+      responses: { '200': { description: OK } }
+  /admin/reference/ingredients/search:
+    get:
+      tags: [Référentiels]
+      summary: Rechercher un ingrédient
+      parameters: [{ name: q, in: query, schema: { type: string } }]
+      responses: { '200': { description: OK } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Jeton renvoyé par /admin/auth/login ou /admin/auth/register.
+  parameters:
+    Csrf:
+      name: X-CSRF-TOKEN
+      in: header
+      description: Jeton obtenu via GET /admin/security/csrf-token.
+      schema: { type: string }
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: integer }
+    RecipeId:
+      name: recipeId
+      in: path
+      required: true
+      schema: { type: integer }
+    SubscriptionId:
+      name: subscriptionId
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    BadRequest:
+      description: Donnée invalide
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Jeton absent, invalide ou expiré
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Accès interdit
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Introuvable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: Trop de tentatives (limitation). Attendre le nombre de secondes de l'en-tête Retry-After.
+      headers:
+        Retry-After:
+          description: Secondes avant la prochaine tentative
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Doublon ou élément encore utilisé
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+    AuthResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user:
+              type: object
+              properties:
+                id: { type: integer }
+                email: { type: string }
+                firstName: { type: string }
+                lastName: { type: string }
+                pseudo: { type: string }
+            token: { type: string }
+            token_type: { type: string, example: Bearer }
+            expires_in: { type: integer, description: Durée de vie en secondes }
+        message: { type: string }
+        code: { type: integer }
+    RecipeInput:
+      type: object
+      properties:
+        name: { type: string, maxLength: 255 }
+        description: { type: string }
+        servings: { type: integer }
+        is_public: { type: boolean }
+        duration: { type: integer }
+        time: { type: integer }
+        difficulty: { type: string }
+        dish_type: { type: string }
+        image: { type: string, description: URL http(s) uniquement }
+        steps: { type: array, items: { type: string } }
+        diet_ids: { type: array, items: { type: integer } }
+        ingredients:
+          type: array
+          items:
+            type: object
+            properties:
+              ingredient_id: { type: integer }
+              quantity: { type: number }
+              unit_id: { type: integer }
+      required: [name, description, servings, is_public]

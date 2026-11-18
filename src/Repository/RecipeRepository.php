@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Rating;
 use App\Entity\Recipe;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -87,6 +88,49 @@ class RecipeRepository extends ServiceEntityRepository
             }
         }
         return $count;
+    }
+
+    /**
+     * Recettes que $viewer a le droit de voir : les publiques et les siennes.
+     *
+     * @return Recipe[]
+     */
+    public function findVisibleTo(User $viewer): array
+    {
+        return $this->createQueryBuilder('r')
+            ->andWhere('r.is_public = true OR r.user = :viewer')
+            ->setParameter('viewer', $viewer)
+            ->orderBy('r.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Nombre de recettes visibles par $viewer, avec filtres optionnels.
+     *
+     * @param array{is_public?: bool, difficulty?: string, dishType?: string, mine?: bool} $filters
+     */
+    public function countVisibleTo(User $viewer, array $filters = []): int
+    {
+        $qb = $this->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->andWhere('r.is_public = true OR r.user = :viewer')
+            ->setParameter('viewer', $viewer);
+
+        if (array_key_exists('is_public', $filters)) {
+            $qb->andWhere('r.is_public = :isPublic')->setParameter('isPublic', (bool) $filters['is_public']);
+        }
+        if (isset($filters['difficulty'])) {
+            $qb->andWhere('r.difficulty = :difficulty')->setParameter('difficulty', (string) $filters['difficulty']);
+        }
+        if (isset($filters['dishType'])) {
+            $qb->andWhere('r.dishType = :dishType')->setParameter('dishType', (string) $filters['dishType']);
+        }
+        if (!empty($filters['mine'])) {
+            $qb->andWhere('r.user = :viewer');
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
     public function countWithCriteria(array $criteria = []): int

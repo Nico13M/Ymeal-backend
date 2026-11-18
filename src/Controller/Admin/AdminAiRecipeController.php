@@ -8,6 +8,7 @@ use App\Service\AiRecipeParserService;
 use App\Service\RecipeService;
 use App\Service\UserManager;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -21,7 +22,8 @@ class AdminAiRecipeController extends AbstractController
         private UserManager $userManager,
         private AiRecipeParserService $parser,
         private RecipeService $recipeService,
-        private EntityManagerInterface $em
+        private EntityManagerInterface $em,
+        private LoggerInterface $logger,
     ) {}
 
     /**
@@ -90,8 +92,9 @@ class AdminAiRecipeController extends AbstractController
                 Response::HTTP_CREATED
             );
         } catch (\Exception $e) {
+            $this->logger->error('Sauvegarde de recette IA impossible', ['exception' => $e]);
             return $this->json(
-                ['success' => false, 'error' => $e->getMessage()],
+                ['success' => false, 'error' => 'Impossible de sauvegarder la recette'],
                 Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }

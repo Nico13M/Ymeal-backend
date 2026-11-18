@@ -28,7 +28,8 @@ class AiRecipeService
             return $response->toArray();
             
         } catch (\Exception $e) {
-            throw new \Exception("Impossible de joindre le générateur de recettes : " . $e->getMessage());
+            // Message générique : le détail (URL interne, réponse brute) reste dans l'exception précédente, pour les logs
+            throw new \RuntimeException('Impossible de joindre le générateur de recettes', 0, $e);
         }
     }
 }

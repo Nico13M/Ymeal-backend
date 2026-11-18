@@ -178,7 +178,7 @@ Deux défauts **déjà présents avant l'audit** ont été trouvés par ces test
 | `composer.json` / `composer.lock` (2026-11-18) | Ajout de `symfony/rate-limiter` 7.4. |
 | `config/packages/security.yaml` (2026-11-18) | Règle `^/admin/user-subscribe/*$` à la place de `/?$` : corrige le contournement par double slash. |
 | `AdminUserSubscribeController` (2026-11-18) | `index()` vérifie `isAdmin()` (défense en profondeur). |
-| `config/packages/nelmio_cors.yaml` | Regex ancrée, `localhost` seulement en dev, `X-User-Id` retiré. `Retry-After` exposé aux navigateurs (`expose_headers`) pour les réponses 429. |
+| `config/packages/nelmio_cors.yaml` | Regex ancrées : front de production et `http://localhost:8081` ; les autres ports localhost sont limités au dev. `X-User-Id` retiré. `Retry-After` exposé aux navigateurs (`expose_headers`) pour les réponses 429. |
 | `.env`, `.env.dev` | Mot de passe et `APP_SECRET` retirés du contenu (toujours suivis par Git, voir « Reste à faire »). |
 | `DataService`, `AiRecipeService`, `AdminAiRecipeController`, `AppController` | Pas de jeton par défaut, messages d'erreur génériques, chemin interne retiré de l'accueil. |
 | `src/Form/UserEditType.php` | Longueur maximale alignée sur la colonne (45). |

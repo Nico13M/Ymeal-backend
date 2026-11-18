@@ -2,7 +2,7 @@
 
 Document destiné à l'équipe front. Il liste ce que les corrections de sécurité du back (branche `Fix/securite`) changent pour le front, de ce qui est **obligatoire** à ce qui est **recommandé**. La référence complète des routes est dans [docs/openapi.yaml](docs/openapi.yaml) (à ouvrir avec `docs/swagger.html`, voir [COMMANDES.md](COMMANDES.md) section 8).
 
-Origine autorisée en production : `https://frontmeal.osc-fr1.scalingo.io` (en développement, `http://localhost` et `http://127.0.0.1` avec un port optionnel). Toute autre origine est refusée par CORS.
+Origines autorisées en production : `https://frontmeal.osc-fr1.scalingo.io` et `http://localhost:8081` (pour le front local). En développement, `http://localhost` et `http://127.0.0.1` sont également autorisés avec un port optionnel. Toute autre origine est refusée par CORS.
 
 ## 1. Obligatoire : sans cela, le front ne fonctionne plus
 

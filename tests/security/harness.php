@@ -275,6 +275,8 @@ echo "\n== 8. CORS ==\n";
 check('origine localhost.evil.com refusée', !$r->headers->has('Access-Control-Allow-Origin'), (string) $r->headers->get('Access-Control-Allow-Origin'));
 [, , $r] = call('OPTIONS', '/admin/recipes/index', ['headers' => ['Origin' => 'https://frontmeal.osc-fr1.scalingo.io', 'Access-Control-Request-Method' => 'GET']]);
 check('origine du front autorisée', $r->headers->get('Access-Control-Allow-Origin') === 'https://frontmeal.osc-fr1.scalingo.io');
+[, , $r] = call('OPTIONS', '/admin/recipes/index', ['headers' => ['Origin' => 'http://localhost:8081', 'Access-Control-Request-Method' => 'GET']]);
+check('origine du front local autorisée', $r->headers->get('Access-Control-Allow-Origin') === 'http://localhost:8081');
 [, , $r] = call('OPTIONS', '/admin/recipes/index', ['headers' => ['Origin' => 'https://frontmeal.osc-fr1.scalingo.io', 'Access-Control-Request-Method' => 'GET', 'Access-Control-Request-Headers' => 'x-user-id']]);
 check('X-User-Id n\'est plus un en-tête CORS autorisé', !str_contains(strtolower((string) $r->headers->get('Access-Control-Allow-Headers')), 'x-user-id'));
 

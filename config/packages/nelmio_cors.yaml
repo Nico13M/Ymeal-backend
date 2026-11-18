@@ -1,9 +1,10 @@
 nelmio_cors:
     defaults:
         origin_regex: true
-        # Seule l'origine du front de production est autorisée (regex ancrée aux deux bouts).
+        # Hors dev, seuls le front de production et le front local exact sont autorisés.
         allow_origin:
             - '^https://frontmeal\.osc-fr1\.scalingo\.io$'
+            - '^http://localhost:8081$'
         # X-User-Id n'est plus accepté : l'identité vient uniquement du jeton signé (Authorization: Bearer)
         allow_headers: ['Content-Type', 'X-CSRF-TOKEN', 'Authorization']
         allow_methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
@@ -14,7 +15,7 @@ nelmio_cors:
     paths:
         '^/': ~
 
-# Le front local n'est autorisé qu'en développement, avec un port optionnel et sans suffixe de domaine
+# En développement, localhost et 127.0.0.1 sont autorisés avec un port optionnel
 # (l'ancien '^http://localhost.*$' acceptait http://localhost.evil.com).
 when@dev:
     nelmio_cors:
